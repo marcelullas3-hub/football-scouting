@@ -197,19 +197,19 @@ function PendingMatchObservations() {
               <label>Proyección<select value={form.projected_level} onChange={(event) => updateForm('projected_level', event.target.value)}>{PROJECTED_LEVELS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
             </div>
             <PositionPicker label="Posición observada" field="position_observed" values={form.position_observed} onToggle={togglePosition} />
-            <button type="button" onClick={() => setProjectedPositionOpen((current) => !current)}>
+            <button className="btn-secondary" type="button" onClick={() => setProjectedPositionOpen((current) => !current)}>
               {projectedPositionOpen ? 'Ocultar posición proyectada' : '+ Añadir posición proyectada'}
             </button>
             {projectedPositionOpen && <PositionPicker label="Posición proyectada" field="projected_position" values={form.projected_position} onToggle={togglePosition} />}
             <label>Nota libre<textarea rows="3" value={form.note} onChange={(event) => updateForm('note', event.target.value)} /></label>
-            <button type="submit" disabled={saving}>{saving ? 'Guardando...' : editingId ? 'Actualizar observación' : 'Registrar observación'}</button>
-            {editingId && <button type="button" onClick={() => { setEditingId(null); setForm(EMPTY_FORM); setProjectedPositionOpen(false) }}>Cancelar edición</button>}
+            <button className="btn-primary" type="submit" disabled={saving}>{saving ? 'Guardando...' : editingId ? 'Actualizar observación' : 'Registrar observación'}</button>
+            {editingId && <button className="btn-secondary" type="button" onClick={() => { setEditingId(null); setForm(EMPTY_FORM); setProjectedPositionOpen(false) }}>Cancelar edición</button>}
           </form>
       </section>
 
       <section className="pending-panel">
         <div className="panel-heading"><div><p className="eyebrow">LISTADO</p><h2>Observaciones registradas</h2></div></div>
-        {observations.length === 0 ? <p>Aún no hay observaciones registradas.</p> : <div className="observation-list">{observations.map((observation) => <article className="observation-row" key={observation.observation_id}><div><strong>{observation.team_display_name} · #{observation.dorsal}</strong><p>{observation.player_canonical_name || 'Jugador sin identificar'} · {observation.position_observed?.join(', ') || 'Sin posición'}</p></div><div><span>{observation.performance_rating ?? '-'} / 10</span>{observation.potential != null && <span>{'⭐'.repeat(observation.potential)}</span>}{isPending && <><button type="button" onClick={() => editObservation(observation)}>Editar</button><button type="button" onClick={() => deleteObservation(observation.observation_id)}>Borrar</button></>}</div></article>)}</div>}
+        {observations.length === 0 ? <p>Aún no hay observaciones registradas.</p> : <div className="observation-list">{observations.map((observation) => <article className="observation-row" key={observation.observation_id}><div><strong>{observation.team_display_name} · #{observation.dorsal}</strong><p>{observation.player_canonical_name || 'Jugador sin identificar'} · {observation.position_observed?.join(', ') || 'Sin posición'}</p></div><div><span>{observation.performance_rating ?? '-'} / 10</span>{observation.potential != null && <span>{'⭐'.repeat(observation.potential)}</span>}{isPending && <><button type="button" onClick={() => editObservation(observation)}>Editar</button><button type="button" className="danger-button" onClick={() => deleteObservation(observation.observation_id)}>Borrar</button></>}</div></article>)}</div>}
       </section>
     </main>
   )

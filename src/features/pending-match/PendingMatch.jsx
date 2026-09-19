@@ -68,7 +68,7 @@ function PendingMatch() {
     <main className="page pending-match">
       <header className="pending-header">
         <div>
-          <p className="eyebrow">PARTIDO {context.status}</p>
+          <p className="eyebrow">Partido pendiente</p>
           <h1>{context.home_team_display_name} <span>vs</span> {context.away_team_display_name}</h1>
           <p>{context.competition_name} · {context.match_date} · {context.season}</p>
           {context.is_delayed && <p className="form-notice">Estás registrando un partido visto en diferido.</p>}

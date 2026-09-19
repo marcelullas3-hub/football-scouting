@@ -8,11 +8,13 @@ import RateMatch from './features/rate-match/RateMatch'
 function Home() {
   return (
     <main className="home">
-      <h1>Football Scouting</h1>
+      <div className="home-content">
+        <h1>Opinball</h1>
 
-      <Link to="/add-match" className="add-match">
-        ＋ AÑADIR PARTIDO
-      </Link>
+        <Link to="/add-match" className="btn btn-primary btn-block">
+          ＋ AÑADIR PARTIDO
+        </Link>
+      </div>
     </main>
   )
 }

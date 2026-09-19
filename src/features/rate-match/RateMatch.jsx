@@ -53,18 +53,18 @@ function RateMatch() {
   }
 
   if (loading) {
-    return <main className="page"><h1>Valorar partido</h1><p>Cargando partido...</p></main>
+    return <main className="page pending-match"><h1>Valorar partido</h1><p>Cargando partido...</p></main>
   }
 
   if (!match) {
-    return <main className="page"><h1>Valorar partido</h1><p>{matchError?.message || 'No se encontró el partido.'}</p></main>
+    return <main className="page pending-match"><h1>Valorar partido</h1><p>{matchError?.message || 'No se encontró el partido.'}</p></main>
   }
 
   return (
     <main className="page pending-match">
       <header className="pending-header">
         <div>
-          <p className="eyebrow">CIERRE · {match.status}</p>
+          <p className="eyebrow">Cierre</p>
           <h1>Valorar partido</h1>
           <p>{match.home_team_display_name || match.home_team_id} <span>vs</span> {match.away_team_display_name || match.away_team_id}</p>
         </div>

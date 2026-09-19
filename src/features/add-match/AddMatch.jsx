@@ -762,18 +762,27 @@ function AddMatch() {
     <main className="page add-match-page">
       <h1>Añadir partido</h1>
 
-      <form onSubmit={handleSubmit}>
+      <div className="wizard-progress" role="presentation">
+        {Array.from({ length: finalStep }, (_, index) => (
+          <span
+            key={index}
+            className={`wizard-progress-dot${index + 1 === currentStep ? ' is-current' : ''}${index + 1 < currentStep ? ' is-done' : ''}`}
+          />
+        ))}
+      </div>
+
+      <form onSubmit={handleSubmit} className="wizard-form">
         {currentStep === 1 && (
           <>
-            <fieldset>
-              <button type="button" onClick={() => selectViewingType('in_person')} aria-pressed={form.viewing_method === 'in_person'}>
-                En el campo
+            <fieldset className="choice-group">
+              <button className="choice-card" type="button" onClick={() => selectViewingType('in_person')} aria-pressed={form.viewing_method === 'in_person'}>
+                🏟️ En el campo
               </button>
-              <button type="button" onClick={() => selectViewingType('live')} aria-pressed={form.viewing_method === 'screen' && !form.is_delayed}>
-                TV en directo
+              <button className="choice-card" type="button" onClick={() => selectViewingType('live')} aria-pressed={form.viewing_method === 'screen' && !form.is_delayed}>
+                📺 TV en directo
               </button>
-              <button type="button" onClick={() => selectViewingType('delayed')} aria-pressed={form.is_delayed}>
-                Diferido
+              <button className="choice-card" type="button" onClick={() => selectViewingType('delayed')} aria-pressed={form.is_delayed}>
+                📅 Diferido
               </button>
             </fieldset>
           </>
@@ -781,7 +790,7 @@ function AddMatch() {
 
         {currentStep === 2 && (
           <>
-            <label>
+            <label className="field">
               Competición
               <input
                 type="text"
@@ -792,9 +801,9 @@ function AddMatch() {
                   if (event.target.value === '') setSelectedCompetitionId('')
                 }}
               />
-              {competitionSearch && !selectedCompetition && <div>
+              {competitionSearch && !selectedCompetition && <div className="search-results">
                 {filteredCompetitions.map((competition) => (
-                  <button key={competition.competition_id} type="button" onClick={() => {
+                  <button className="search-result-item" key={competition.competition_id} type="button" onClick={() => {
                     setSelectedCompetitionId(competition.competition_id)
                     setCompetitionSearch(competition.canonical_name)
                   }}>
@@ -804,36 +813,36 @@ function AddMatch() {
               </div>}
             </label>
 
-            {competitionsError && <p>Error cargando competiciones: {competitionsError}</p>}
+            {competitionsError && <p className="field-error">Error cargando competiciones: {competitionsError}</p>}
 
-            {selectedCompetition && hasMultiplePhases && <label>
+            {selectedCompetition && hasMultiplePhases && <label className="field">
               Fase
               <select value={form.phase} onChange={(event) => updateForm('phase', event.target.value)}>
                 {phaseOptions.map((phase) => <option key={phase} value={phase}>{phase}</option>)}
               </select>
             </label>}
 
-            <div>
-              <button type="button" onClick={goToPreviousStep}>Atrás</button>
-              <button type="button" onClick={goToNextStep}>Siguiente</button>
+            <div className="wizard-nav">
+              <button className="btn btn-secondary" type="button" onClick={goToPreviousStep}>Atrás</button>
+              <button className="btn btn-primary" type="button" onClick={goToNextStep}>Siguiente</button>
             </div>
           </>
         )}
 
         {currentStep === 3 && form.is_delayed && (
           <>
-            <fieldset>
-              <button type="button" onClick={() => selectDelayedInputMode('date')} aria-pressed={delayedInputMode === 'date'}>
+            <fieldset className="choice-group">
+              <button className="choice-card" type="button" onClick={() => selectDelayedInputMode('date')} aria-pressed={delayedInputMode === 'date'}>
                 Sé la fecha exacta
               </button>
-              <button type="button" onClick={() => selectDelayedInputMode('season')} aria-pressed={delayedInputMode === 'season'}>
+              <button className="choice-card" type="button" onClick={() => selectDelayedInputMode('season')} aria-pressed={delayedInputMode === 'season'}>
                 Solo sé la temporada
               </button>
-              {delayedInputMode === 'date' && <label>
+              {delayedInputMode === 'date' && <label className="field">
                 Fecha
                 <input type="date" min="1850-01-01" max={today} value={form.match_date || ''} onChange={(event) => updateForm('match_date', event.target.value || null)} />
               </label>}
-              {delayedInputMode === 'season' && <label>
+              {delayedInputMode === 'season' && <label className="field">
                 Temporada
                 <select value={form.season} onChange={(event) => updateForm('season', event.target.value)} disabled={seasonLoading}>
                   <option value="">{seasonLoading ? 'Cargando temporadas...' : 'Seleccionar temporada'}</option>
@@ -841,16 +850,16 @@ function AddMatch() {
                 </select>
               </label>}
             </fieldset>
-            <div>
-              <button type="button" onClick={goToPreviousStep}>Atrás</button>
-              <button type="button" onClick={goToNextStep}>Siguiente</button>
+            <div className="wizard-nav">
+              <button className="btn btn-secondary" type="button" onClick={goToPreviousStep}>Atrás</button>
+              <button className="btn btn-primary" type="button" onClick={goToNextStep}>Siguiente</button>
             </div>
           </>
         )}
 
         {currentStep === teamsStep && (
           <>
-            <label>
+            <label className="field">
               Local
               <input
                 type="text"
@@ -862,24 +871,25 @@ function AddMatch() {
                 }}
               />
 
-              {teamsError && <p>Error cargando equipos: {teamsError}</p>}
-              {homeTeamSearchLoading && <p>Cargando equipos...</p>}
-              {homeTeamSearchError && <p role="alert">{homeTeamSearchError}</p>}
+              {teamsError && <p className="field-error">Error cargando equipos: {teamsError}</p>}
+              {homeTeamSearchLoading && <p className="field-hint">Cargando equipos...</p>}
+              {homeTeamSearchError && <p className="field-error" role="alert">{homeTeamSearchError}</p>}
               {dataWarnings.length > 0 && (
-                <p role="alert">
+                <p className="field-error" role="alert">
                   Datos incompletos: {dataWarnings.join(' | ')}
                 </p>
               )}
 
               {homeTeamSearch && !homeTeam && (
-                <div>
+                <div className="search-results">
                   {filteredHomeTeams.length === 0 && !homeTeamSearchLoading ? (
-                    <p>
+                    <p className="field-hint">
                       {homeTeamOptions.length > 0 ? homeTeamNoResultsMessage : 'No hay equipos con ese texto.'}
                     </p>
                   ) : (
                     filteredHomeTeams.map((team) => (
                       <button
+                        className="search-result-item"
                         key={team.team_id}
                         type="button"
                         onClick={() => selectHomeTeam(team)}
@@ -893,7 +903,7 @@ function AddMatch() {
 
             </label>
 
-            <label>
+            <label className="field">
               Visitante
               <input
                 type="text"
@@ -905,18 +915,19 @@ function AddMatch() {
                 }}
               />
 
-              {awayTeamSearchLoading && <p>Cargando equipos...</p>}
-              {awayTeamSearchError && <p role="alert">{awayTeamSearchError}</p>}
+              {awayTeamSearchLoading && <p className="field-hint">Cargando equipos...</p>}
+              {awayTeamSearchError && <p className="field-error" role="alert">{awayTeamSearchError}</p>}
 
               {awayTeamSearch && !awayTeam && (
-                <div>
+                <div className="search-results">
                   {filteredAwayTeams.length === 0 && !awayTeamSearchLoading ? (
-                    <p>
+                    <p className="field-hint">
                       {awayTeamOptions.length > 0 ? awayTeamNoResultsMessage : 'No hay equipos con ese texto.'}
                     </p>
                   ) : (
                     filteredAwayTeams.map((team) => (
                       <button
+                        className="search-result-item"
                         key={team.team_id}
                         type="button"
                         onClick={() => selectAwayTeam(team)}
@@ -930,11 +941,12 @@ function AddMatch() {
 
             </label>
 
-            <div>
-              <button type="button" onClick={goToPreviousStep}>
+            <div className="wizard-nav">
+              <button className="btn btn-secondary" type="button" onClick={goToPreviousStep}>
                 Atrás
               </button>
               <button
+                className="btn btn-primary"
                 type="button"
                 onClick={() => {
                   if (!homeTeam || !awayTeam) {
@@ -964,33 +976,24 @@ function AddMatch() {
               <p>{selectedCompetition?.canonical_name} {form.season}</p>
             </div>
 
-            <div>
-              <button type="button" onClick={goToPreviousStep}>
+            <div className="wizard-nav">
+              <button className="btn btn-secondary" type="button" onClick={goToPreviousStep}>
                 Atrás
               </button>
-              <button type="submit" disabled={isSaving}>
+              <button className="btn btn-primary" type="submit" disabled={isSaving}>
                 {isSaving ? 'Guardando...' : 'Añadir partido'}
               </button>
             </div>
           </>
         )}
 
-        {saveError && <p role="alert">{saveError}</p>}
-        {saveSuccess && <p>{saveSuccess}</p>}
+        {saveError && <p className="field-error" role="alert">{saveError}</p>}
+        {saveSuccess && <p className="field-notice">{saveSuccess}</p>}
 
         <button
           type="button"
+          className="btn-ghost"
           onClick={handleReturnHome}
-          style={{
-            background: 'none',
-            border: 0,
-            color: 'inherit',
-            cursor: 'pointer',
-            fontSize: '0.85rem',
-            marginTop: '1rem',
-            opacity: 0.65,
-            padding: '0.25rem 0',
-          }}
         >
           🏠 Volver al inicio
         </button>
