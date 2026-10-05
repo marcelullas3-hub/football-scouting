@@ -20,7 +20,7 @@ function numericMetrics(row, { includeObservations = true } = {}) {
 }
 
 function rowName(row, scope, favoriteNames) {
-  const entityId = scope === 'team' ? row.team_id : row.competition_id
+  const entityId = row.entity_id || (scope === 'team' ? row.team_id : row.competition_id)
   const favoriteName = favoriteNames.get(entityId)
   if (favoriteName) return favoriteName
   if (scope === 'team') return row.team_display_name || row.team_name || row.canonical_name || 'Equipo'
@@ -77,7 +77,7 @@ export default function MyStats() {
     if (scope === 'team' || scope === 'competition') {
       return favoriteItems.map((favorite) => ({
         ...favorite,
-        ...scopedRows.find((row) => row[favoriteIdField] === favorite[favoriteIdField]),
+        ...scopedRows.find((row) => (row.entity_id || row[favoriteIdField]) === favorite[favoriteIdField]),
       }))
     }
     return scopedRows
