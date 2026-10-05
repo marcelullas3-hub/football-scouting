@@ -53,6 +53,11 @@
 .delayed-mode-options label { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; }
 .delayed-mode-options input { accent-color: var(--brand-blue); }
 .friendly-note { padding: 10px 12px; border-left: 3px solid var(--accent-lime); background: #f8fbe9; color: var(--text-h); font-size: 13px; }
+.match-current-date, .match-calculated-season { min-height: 48px; display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 5px; background: #fff; color: var(--brand-blue); font-size: 13px; }
+.match-current-date strong { color: var(--text-h); font-weight: 650; }
+.match-calculated-season { justify-content: space-between; }
+.match-calculated-season > span { color: var(--text); }
+.match-calculated-season > strong { color: var(--text-h); font-size: 13px; }
 .match-form-error { padding: 10px 12px; border-left: 3px solid var(--danger); background: #fff2f0; color: #8e1d16; font-size: 13px; }
 .match-form-actions { display: flex; justify-content: space-between; gap: 12px; }
 @media (max-width: 520px) { .match-create-heading h1 { font-size: 31px; } .pending-queue-link { grid-template-columns: 36px minmax(0,1fr) 18px; gap: 9px; padding-inline: 11px; } .pending-queue-link small { font-size: 11px; } .match-form-actions > * { flex: 1; } }

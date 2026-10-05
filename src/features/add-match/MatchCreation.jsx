@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ArrowLeft, ArrowRight, Clock3, MapPin, MonitorPlay } from 'lucide-react'
+import { ArrowLeft, ArrowRight, CalendarDays, Clock3, MapPin, MonitorPlay } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../shared/supabaseClient'
 import PendingMatchesList from '../pending-match/PendingMatchesList'
@@ -41,6 +41,7 @@ export default function MatchCreation() {
   const [seasonOptions, setSeasonOptions] = useState([])
   const [seasonChoice, setSeasonChoice] = useState('')
   const [customSeason, setCustomSeason] = useState('')
+  const [calculatedSeason, setCalculatedSeason] = useState('')
   const [phase, setPhase] = useState('')
   const [loadingCompetitions, setLoadingCompetitions] = useState(true)
   const [loadingHome, setLoadingHome] = useState(false)
@@ -51,8 +52,14 @@ export default function MatchCreation() {
 
   const competition = competitions.find((item) => item.competition_id === competitionId) || null
   const friendly = isFriendlyCompetition(competition)
-  const phaseOptions = useMemo(() => getPhaseOptions(competition?.available_phases), [competition])
-  const finalSeason = seasonChoice === '__custom__' ? customSeason.trim() : seasonChoice
+  const phaseOptions = useMemo(() => {
+    const available = getPhaseOptions(competition?.available_phases)
+    return available.length ? available : (competition && !friendly ? ['league_phase'] : [])
+  }, [competition, friendly])
+  const seasonOnlyMode = isDelayed && delayedMode === 'season'
+  const finalSeason = seasonOnlyMode
+    ? (seasonChoice === '__custom__' ? customSeason.trim() : seasonChoice)
+    : calculatedSeason
   const filteredCompetitions = useMemo(() => {
     const query = competitionSearch.trim().toLocaleLowerCase()
     const sorted = sortFavoriteOptions(competitions)
@@ -113,7 +120,10 @@ export default function MatchCreation() {
 
   useEffect(() => {
     let active = true
-    if (step !== 3 || friendly) return undefined
+    if (step !== 3 || friendly || !seasonOnlyMode) {
+      setSeasonOptions([])
+      return undefined
+    }
     async function loadSeasons() {
       setLoadingSeasons(true)
       const { data, error: requestError } = await supabase.rpc('get_my_seasons')
@@ -124,7 +134,34 @@ export default function MatchCreation() {
     }
     loadSeasons()
     return () => { active = false }
-  }, [step, friendly])
+  }, [step, friendly, seasonOnlyMode])
+
+  useEffect(() => {
+    let active = true
+    if (step !== 3 || friendly || seasonOnlyMode || !competitionId || !matchDate) {
+      setCalculatedSeason('')
+      return undefined
+    }
+
+    async function calculateSeason() {
+      setLoadingSeasons(true)
+      const { data, error: requestError } = await supabase.rpc('calculate_season', {
+        p_date: matchDate,
+        p_competition_id: competitionId,
+      })
+      if (!active) return
+      if (requestError) {
+        setCalculatedSeason('')
+        setError(errorMessage(requestError))
+      } else {
+        setCalculatedSeason(typeof data === 'string' ? data : data?.season || '')
+      }
+      setLoadingSeasons(false)
+    }
+
+    calculateSeason()
+    return () => { active = false }
+  }, [step, friendly, seasonOnlyMode, competitionId, matchDate])
 
   function chooseCompetition(item) {
     setCompetitionId(item.competition_id)
@@ -136,7 +173,8 @@ export default function MatchCreation() {
     setAwayTeam(null)
     setSeasonChoice('')
     setCustomSeason('')
-    setPhase(getPhaseOptions(item.available_phases)[0] || '')
+    setCalculatedSeason('')
+    setPhase(getPhaseOptions(item.available_phases)[0] || (isFriendlyCompetition(item) ? '' : 'league_phase'))
     setError('')
   }
 
@@ -147,6 +185,7 @@ export default function MatchCreation() {
     setMatchDate(method === 'delayed' ? '' : TODAY)
     setSeasonChoice('')
     setCustomSeason('')
+    setCalculatedSeason('')
     setError('')
     setStep(3)
   }
@@ -156,7 +195,8 @@ export default function MatchCreation() {
     if (friendly && (!matchDate || delayedMode !== 'date')) return 'Los amistosos necesitan una fecha exacta.'
     if (isDelayed && !delayedMode) return 'Indica la fecha exacta o la temporada.'
     if (delayedMode === 'date' && (!matchDate || matchDate < MIN_DATE || matchDate > TODAY)) return 'La fecha debe estar entre el 1 de enero de 1850 y hoy.'
-    if (!friendly && !finalSeason) return 'Indica la temporada para esta competición.'
+    if (!friendly && !seasonOnlyMode && !finalSeason) return 'No se pudo calcular la temporada para esta fecha.'
+    if (!friendly && seasonOnlyMode && !finalSeason) return 'Indica la temporada del partido.'
     return ''
   }
 
@@ -228,10 +268,12 @@ export default function MatchCreation() {
 
       {step === 3 && <form className="match-step-content" onSubmit={saveMatch}>
         <div className="step-title"><p>PASO 3</p><h2>Detalles del partido</h2><span>{getDisplayName(homeTeam)} vs {getDisplayName(awayTeam)}</span></div>
-        {isDelayed && !friendly && <fieldset className="delayed-mode-options"><legend>¿Qué dato recuerdas?</legend><label><input type="radio" name="delayedMode" checked={delayedMode === 'date'} onChange={() => { setDelayedMode('date'); setMatchDate(''); setSeasonChoice('') }} /> Fecha exacta</label><label><input type="radio" name="delayedMode" checked={delayedMode === 'season'} onChange={() => { setDelayedMode('season'); setMatchDate(''); setSeasonChoice('') }} /> Solo temporada</label></fieldset>}
-        {(friendly || delayedMode === 'date' || !isDelayed) && <label className="match-field">Fecha exacta<input type="date" min={MIN_DATE} max={TODAY} value={matchDate} onChange={(event) => setMatchDate(event.target.value)} required /></label>}
+        {isDelayed && !friendly && <fieldset className="delayed-mode-options"><legend>¿Qué dato recuerdas?</legend><label><input type="radio" name="delayedMode" checked={delayedMode === 'date'} onChange={() => { setDelayedMode('date'); setMatchDate(''); setSeasonChoice(''); setCalculatedSeason('') }} /> Fecha exacta</label><label><input type="radio" name="delayedMode" checked={delayedMode === 'season'} onChange={() => { setDelayedMode('season'); setMatchDate(''); setSeasonChoice(''); setCalculatedSeason('') }} /> Solo temporada</label></fieldset>}
+        {isDelayed && (friendly || delayedMode === 'date') && <label className="match-field">Fecha exacta<input type="date" min={MIN_DATE} max={TODAY} value={matchDate} onChange={(event) => setMatchDate(event.target.value)} required /></label>}
+        {!isDelayed && <div className="match-current-date"><CalendarDays size={18} /><span>Hoy <strong>({new Intl.DateTimeFormat('es-ES', { dateStyle: 'long' }).format(new Date())})</strong></span></div>}
         {!friendly && phaseOptions.length > 0 && <label className="match-field">Fase<select value={phase} onChange={(event) => setPhase(event.target.value)}>{phaseOptions.map((option) => <option key={option} value={option}>{option.replaceAll('_', ' ')}</option>)}</select></label>}
-        {!friendly && <label className="match-field">Temporada<select value={seasonChoice} onChange={(event) => setSeasonChoice(event.target.value)} disabled={loadingSeasons}><option value="">{loadingSeasons ? 'Cargando temporadas…' : 'Seleccionar temporada'}</option>{seasonOptions.map((season) => <option key={season} value={season}>{season}</option>)}<option value="__custom__">Indicar otra temporada</option></select>{seasonChoice === '__custom__' && <input aria-label="Escribir temporada" placeholder="Ej. 2025/26" value={customSeason} onChange={(event) => setCustomSeason(event.target.value)} required />}</label>}
+        {!friendly && seasonOnlyMode && <label className="match-field">Temporada<select value={seasonChoice} onChange={(event) => setSeasonChoice(event.target.value)} disabled={loadingSeasons}><option value="">{loadingSeasons ? 'Cargando temporadas…' : 'Seleccionar temporada'}</option>{seasonOptions.map((season) => <option key={season} value={season}>{season}</option>)}<option value="__custom__">Indicar otra temporada</option></select>{seasonChoice === '__custom__' && <input aria-label="Escribir temporada" placeholder="Ej. 2025/26" value={customSeason} onChange={(event) => setCustomSeason(event.target.value)} required />}</label>}
+        {!friendly && !seasonOnlyMode && <div className="match-calculated-season"><span>Temporada</span><strong>{loadingSeasons ? 'Calculando…' : calculatedSeason || 'No disponible'}</strong></div>}
         {friendly && <p className="friendly-note">Amistoso · sin fase ni temporada</p>}
         {error && <p className="match-form-error" role="alert">{error}</p>}
         <div className="match-form-actions"><button className="match-back-button" type="button" onClick={() => { setError(''); setStep(2) }}><ArrowLeft size={17} /> Volver</button><button className="match-primary-button" type="submit" disabled={saving}>{saving ? 'Guardando…' : 'Crear partido'} <ArrowRight size={18} /></button></div>
