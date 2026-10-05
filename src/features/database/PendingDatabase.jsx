@@ -119,7 +119,7 @@ export default function PendingDatabase() {
         p_rating_max: null,
         p_rating_exact: null,
         p_include_pending: true,
-        p_order: 'match_date_desc',
+        p_order: 'date_desc',
         p_limit: pageSize,
         p_offset: offset,
       })
@@ -238,7 +238,7 @@ export default function PendingDatabase() {
         p_rating_max: maximum,
         p_rating_exact: exact,
         p_include_pending: true,
-        p_order: 'match_date_desc',
+        p_order: 'date_desc',
         p_limit: 100,
         p_offset: 0,
       })
