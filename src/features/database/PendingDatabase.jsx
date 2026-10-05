@@ -44,9 +44,10 @@ function MatchResult({ match }) {
 }
 
 function ObservationResult({ observation, context }) {
+  const teamName = context.get('__teamNames')?.get(observation.team_id) || 'Equipo'
+  const playerName = observation.player_canonical_name
   const match = context.get(observation.match_id)
-  const teamName = observation.team_display_name || observation.team_name || match?.home_team_display_name || match?.away_team_display_name || 'Equipo'
-  return <article className="explorer-result"><div className="explorer-result-main"><strong>{teamName} · #{observation.dorsal}</strong><small>{match ? `${match.home_team_display_name} vs ${match.away_team_display_name}` : 'Partido observado'} · {observation.position_observed?.join(', ') || 'Sin posición'}</small></div><div className="explorer-result-meta"><span>{observation.performance_rating ?? '—'}<small>/10</small></span></div></article>
+  return <article className="explorer-result"><div className="explorer-result-main"><strong>{teamName} · #{observation.dorsal}{playerName ? ` · ${playerName}` : ''}</strong><small>{match ? `${match.home_team_display_name} vs ${match.away_team_display_name}` : 'Partido observado'} · {observation.position_observed?.join(', ') || 'Sin posición'}</small></div><div className="explorer-result-meta"><span>{observation.performance_rating ?? '—'}<small>/10</small></span></div></article>
 }
 
 export default function PendingDatabase() {
@@ -174,80 +175,34 @@ export default function PendingDatabase() {
     setObservationContexts(new Map())
 
     if (category === 'teams') {
-      const aggregatePromise = loadAggregateStats().catch((requestError) => {
+      const aggregateMap = await loadAggregateStats().catch((requestError) => {
         setError(backendErrorMessage(requestError))
         return new Map()
       })
-      const observationRows = []
-      let observationOffset = 0
-      const observationPageSize = 1000
-      let observationError = null
-      while (true) {
-        const { data, error: requestError } = await supabase
-          .from('observations')
-          .select('observation_id, team_id, match_id')
-          .not('team_id', 'is', null)
-          .order('observation_id')
-          .range(observationOffset, observationOffset + observationPageSize - 1)
-        if (requestError) {
-          observationError = requestError
-          break
-        }
-        observationRows.push(...(data || []))
-        if (!data || data.length < observationPageSize) break
-        observationOffset += observationPageSize
-      }
-
-      let scopedObservations = observationRows
-      if (!observationError && (filters.competitionId || filters.season || filters.viewingMethod)) {
-        const observedMatchIds = [...new Set(observationRows.map((row) => row.match_id).filter(Boolean))]
-        const matchContexts = new Map()
-        for (let index = 0; index < observedMatchIds.length; index += 100) {
-          const { data, error: contextError } = await supabase
-            .from('v_match_context')
-            .select('match_id, competition_id, season, viewing_method')
-            .in('match_id', observedMatchIds.slice(index, index + 100))
-          if (contextError) {
-            observationError = contextError
-            break
-          }
-          for (const context of data || []) matchContexts.set(context.match_id, context)
-        }
-        if (!observationError) {
-          scopedObservations = observationRows.filter((observation) => {
-            const context = matchContexts.get(observation.match_id)
-            if (!context) return false
-            if (filters.competitionId && context.competition_id !== filters.competitionId) return false
-            if (filters.season && context.season !== filters.season) return false
-            if (filters.viewingMethod && context.viewing_method !== filters.viewingMethod) return false
-            return true
-          })
-        }
-      }
-      const observedTeamIds = [...new Set(scopedObservations.map((row) => row.team_id).filter(Boolean))]
-      let observedTeams = []
-      if (!observationError && observedTeamIds.length) {
-        for (let index = 0; index < observedTeamIds.length; index += 100) {
+      const viewedTeamIds = [...aggregateMap.keys()]
+      let viewedTeams = []
+      let teamsError = null
+      if (viewedTeamIds.length) {
+        for (let index = 0; index < viewedTeamIds.length; index += 100) {
           let teamsRequest = supabase
             .from('teams')
             .select('team_id, canonical_name, country_id, team_type')
-            .in('team_id', observedTeamIds.slice(index, index + 100))
+            .in('team_id', viewedTeamIds.slice(index, index + 100))
           if (filters.countryId) teamsRequest = teamsRequest.eq('country_id', filters.countryId)
           if (filters.competitionType) teamsRequest = teamsRequest.eq('team_type', filters.competitionType)
-          const { data, error: teamsError } = await teamsRequest
-          if (teamsError) {
-            observationError = teamsError
+          const { data, error: requestError } = await teamsRequest
+          if (requestError) {
+            teamsError = requestError
             break
           }
-          observedTeams.push(...(data || []))
+          viewedTeams.push(...(data || []))
         }
       }
 
-      if (observationError) setError(backendErrorMessage(observationError))
+      if (teamsError) setError(backendErrorMessage(teamsError))
       else {
-        const aggregateMap = await aggregatePromise
         const normalizedQuery = query.trim().toLocaleLowerCase()
-        const filtered = observedTeams.filter((team) => {
+        const filtered = viewedTeams.filter((team) => {
           if (normalizedQuery && !getDisplayName(team).toLocaleLowerCase().includes(normalizedQuery)) return false
           return true
         }).map((team) => ({ ...team, stats: aggregateMap.get(team.team_id) }))
@@ -256,11 +211,9 @@ export default function PendingDatabase() {
           const secondValue = Number(filters.orderBy === 'rating' ? second.stats?.avg_rating_total : second.stats?.matches_total) || 0
           return secondValue - firstValue
         }).slice(0, 10))
-        const matchedTeams = filtered
-        const matchesCount = matchedTeams.reduce((total, team) => total + Number(team.stats?.matches_total || 0), 0)
-        setResultSummary({ count: matchedTeams.length, label: 'equipos con observaciones', secondary: `${matchesCount} partidos con los filtros actuales` })
+        const appearances = filtered.reduce((total, team) => total + Number(team.stats?.matches_total || 0), 0)
+        setResultSummary({ count: filtered.length, label: 'equipos con partidos vistos', secondary: `${appearances} apariciones de equipo con los filtros actuales` })
       }
-      if (observationError) await aggregatePromise
     } else if (category === 'matches') {
       const exact = filters.ratingMode === 'exact' && filters.ratingExact ? Number(filters.ratingExact) : null
       const minimum = filters.ratingMode === 'range' && filters.ratingMin ? Number(filters.ratingMin) : null
@@ -358,9 +311,33 @@ export default function PendingDatabase() {
           if (filters.viewingMethod && context?.viewing_method !== filters.viewingMethod) return false
           return true
         })
-        setResults(filtered.slice(0, 10))
+        const visibleObservations = filtered.slice(0, 10)
+        const teamIds = [...new Set(visibleObservations.map((item) => item.team_id).filter(Boolean))]
+        const teamNames = new Map()
+        if (teamIds.length) {
+          const { data: teamRows, error: teamError } = await supabase
+            .from('teams')
+            .select('team_id, canonical_name')
+            .in('team_id', teamIds)
+          if (teamError) setError(backendErrorMessage(teamError))
+          else for (const team of teamRows || []) teamNames.set(team.team_id, team.canonical_name)
+        }
+
+        const visibleMatchIds = [...new Set(visibleObservations.map((item) => item.match_id).filter(Boolean))]
+        const playerNames = new Map()
+        const matchObservationResults = await Promise.all(visibleMatchIds.map((matchId) => supabase.rpc('get_match_observations', { p_match_id: matchId })))
+        for (const response of matchObservationResults) {
+          if (response.error) continue
+          for (const matchObservation of response.data || []) {
+            if (matchObservation.player_canonical_name) playerNames.set(matchObservation.observation_id, matchObservation.player_canonical_name)
+          }
+        }
+        setResults(visibleObservations.map((item) => ({
+          ...item,
+          player_canonical_name: item.player_canonical_name || playerNames.get(item.observation_id) || null,
+        })))
         setResultSummary({ count: filtered.length, label: 'observaciones que cumplen los filtros', secondary: `${new Set(filtered.map((item) => item.match_id)).size} partidos` })
-        setObservationContexts(contextMap)
+        setObservationContexts(new Map([...contextMap, ['__teamNames', teamNames]]))
       }
     } else if (category === 'competitions') {
       const aggregateMap = await loadAggregateStats().catch((requestError) => {
