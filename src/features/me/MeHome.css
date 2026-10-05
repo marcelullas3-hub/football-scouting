@@ -1,0 +1,25 @@
+.me-home { width: min(100%, 900px); margin: 0 auto; color: var(--text-h); }
+.me-home-heading { margin-bottom: 28px; }
+.me-home-heading h1 { margin: 5px 0 6px; font-size: 38px; }
+.me-home-heading > p:last-child { color: var(--text); font-size: 14px; }
+.me-eyebrow { color: var(--brand-blue); font-size: 10px; font-weight: 800; letter-spacing: 1px; }
+.me-metric-section { padding: 23px 0; border-top: 1px solid var(--border); }
+.me-section-heading { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+.me-section-heading h2 { margin: 3px 0 0; font-size: 23px; }
+.me-section-icon, .me-shortcut-icon { display: grid; width: 38px; aspect-ratio: 1; place-items: center; border-radius: 5px; background: #e9eeff; color: var(--brand-blue); }
+.me-metric-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); border-top: 1px solid var(--border); border-left: 1px solid var(--border); }
+.me-metric { min-height: 98px; display: flex; flex-direction: column; justify-content: space-between; gap: 10px; padding: 14px; border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); background: #fff; }
+.me-metric > span { color: var(--text); font-size: 12px; text-transform: capitalize; }
+.me-metric strong { color: var(--text-h); font-family: var(--heading); font-size: 29px; line-height: 1; font-variant-numeric: tabular-nums; }
+.me-empty { padding: 19px 0; color: var(--text); font-size: 14px; }
+.me-loading { display: flex; align-items: center; gap: 9px; padding: 18px 0; color: var(--text); font-size: 14px; }
+.me-spinner { animation: me-spin 1s linear infinite; }
+.me-error { margin-bottom: 18px; padding: 11px 13px; border-left: 3px solid var(--danger); background: #fff2f0; color: #8e1d16; font-size: 13px; }
+.me-shortcuts { display: grid; border-top: 1px solid var(--border); }
+.me-shortcuts a { min-height: 72px; display: grid; grid-template-columns: 40px minmax(0, 1fr) 18px; align-items: center; gap: 12px; border-bottom: 1px solid var(--border); color: var(--text-h); text-decoration: none; }
+.me-shortcuts a:hover > span:nth-child(2) strong { color: var(--brand-blue); }
+.me-shortcuts a > span:nth-child(2) { display: grid; gap: 2px; }
+.me-shortcuts strong { font-size: 14px; }
+.me-shortcuts small { color: var(--text); font-size: 12px; }
+@keyframes me-spin { to { transform: rotate(360deg); } }
+@media (max-width: 520px) { .me-home-heading h1 { font-size: 33px; } .me-metric-grid { grid-template-columns: repeat(2, minmax(0,1fr)); } }

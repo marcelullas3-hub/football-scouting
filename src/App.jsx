@@ -8,6 +8,7 @@ import Login from './features/auth/Login'
 import PwaUpdateNotice from './features/auth/PwaUpdateNotice'
 import { AuthProvider, useAuth } from './shared/AuthContext'
 import AppLayout from './shared/AppLayout'
+import MeHome from './features/me/MeHome'
 
 function ProtectedRoute({ children }) {
   const { session, loading } = useAuth()
@@ -27,6 +28,7 @@ function AppRoutes() {
         <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
           <Route path="/" element={<Navigate to="/add-match" replace />} />
           <Route path="/add-match" element={<AddMatch />} />
+          <Route path="/me" element={<MeHome />} />
           <Route path="/match/:matchId/pending" element={<PendingMatch />} />
           <Route path="/match/:matchId/pending/observations" element={<PendingMatchObservations />} />
           <Route path="/match/:matchId/rate" element={<RateMatch />} />
