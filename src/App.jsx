@@ -10,6 +10,7 @@ import { AuthProvider, useAuth } from './shared/AuthContext'
 import AppLayout from './shared/AppLayout'
 import MeHome from './features/me/MeHome'
 import MyProfile from './features/me/MyProfile'
+import MyStats from './features/me/MyStats'
 
 function ProtectedRoute({ children }) {
   const { session, loading } = useAuth()
@@ -31,6 +32,7 @@ function AppRoutes() {
           <Route path="/add-match" element={<AddMatch />} />
           <Route path="/me" element={<MeHome />} />
           <Route path="/me/profile" element={<MyProfile />} />
+          <Route path="/me/stats" element={<MyStats />} />
           <Route path="/match/:matchId/pending" element={<PendingMatch />} />
           <Route path="/match/:matchId/pending/observations" element={<PendingMatchObservations />} />
           <Route path="/match/:matchId/rate" element={<RateMatch />} />
