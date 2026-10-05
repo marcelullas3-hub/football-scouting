@@ -11,6 +11,7 @@ import AppLayout from './shared/AppLayout'
 import MeHome from './features/me/MeHome'
 import MyProfile from './features/me/MyProfile'
 import MyStats from './features/me/MyStats'
+import DatabasePage from './features/database/DatabasePage'
 
 function ProtectedRoute({ children }) {
   const { session, loading } = useAuth()
@@ -33,6 +34,7 @@ function AppRoutes() {
           <Route path="/me" element={<MeHome />} />
           <Route path="/me/profile" element={<MyProfile />} />
           <Route path="/me/stats" element={<MyStats />} />
+          <Route path="/database" element={<DatabasePage />} />
           <Route path="/match/:matchId/pending" element={<PendingMatch />} />
           <Route path="/match/:matchId/pending/observations" element={<PendingMatchObservations />} />
           <Route path="/match/:matchId/rate" element={<RateMatch />} />
