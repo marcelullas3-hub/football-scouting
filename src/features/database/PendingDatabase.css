@@ -1,0 +1,6 @@
+.pending-database { width: min(100%, 900px); margin: 0 auto; color: var(--text-h); }
+.pending-database-heading { display: flex; align-items: center; gap: 13px; margin-bottom: 26px; }
+.pending-database-icon { display: grid; width: 42px; aspect-ratio: 1; place-items: center; border-radius: 5px; background: var(--brand-blue); color: #fff; }
+.pending-database-heading p { color: var(--brand-blue); font-size: 10px; font-weight: 800; letter-spacing: 1px; }
+.pending-database-heading h1 { margin: 3px 0 0; font-size: 32px; }
+@media (max-width: 520px) { .pending-database-heading h1 { font-size: 28px; } }

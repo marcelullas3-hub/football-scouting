@@ -11,7 +11,7 @@ import AppLayout from './shared/AppLayout'
 import MeHome from './features/me/MeHome'
 import MyProfile from './features/me/MyProfile'
 import MyStats from './features/me/MyStats'
-import DatabasePage from './features/database/DatabasePage'
+import DatabasePage from './features/database/PendingDatabase'
 import SocialPage from './features/social/SocialPage'
 
 function ProtectedRoute({ children }) {

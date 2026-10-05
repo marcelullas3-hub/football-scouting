@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ArrowLeft, ArrowRight, Clock3, MapPin, MonitorPlay } from 'lucide-react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../shared/supabaseClient'
+import PendingMatchesList from '../pending-match/PendingMatchesList'
 import EntitySearch from './EntitySearch'
 import { getDisplayName, getPhaseOptions, getSeasonValues, isFriendlyCompetition, sortFavoriteOptions } from './addMatchRules'
 import './AddMatch.css'
@@ -24,6 +25,7 @@ export default function MatchCreation() {
   const [step, setStep] = useState(1)
   const [competitions, setCompetitions] = useState([])
   const [competitionSearch, setCompetitionSearch] = useState('')
+  const [competitionSearchOpen, setCompetitionSearchOpen] = useState(false)
   const [competitionId, setCompetitionId] = useState('')
   const [homeSearch, setHomeSearch] = useState('')
   const [awaySearch, setAwaySearch] = useState('')
@@ -54,7 +56,7 @@ export default function MatchCreation() {
   const filteredCompetitions = useMemo(() => {
     const query = competitionSearch.trim().toLocaleLowerCase()
     const sorted = sortFavoriteOptions(competitions)
-    return (query ? sorted.filter((item) => item.canonical_name.toLocaleLowerCase().includes(query)) : sorted).slice(0, 8)
+    return (query ? sorted.filter((item) => item.canonical_name.toLocaleLowerCase().includes(query)) : sorted).slice(0, 4)
   }, [competitionSearch, competitions])
 
   useEffect(() => {
@@ -127,6 +129,7 @@ export default function MatchCreation() {
   function chooseCompetition(item) {
     setCompetitionId(item.competition_id)
     setCompetitionSearch(item.canonical_name)
+    setCompetitionSearchOpen(false)
     setHomeSearch('')
     setAwaySearch('')
     setHomeTeam(null)
@@ -198,12 +201,12 @@ export default function MatchCreation() {
   return (
     <section className="match-create-page">
       <div className="match-create-heading"><div><p className="match-create-kicker">OPINBALL · SCOUTING</p><h1>Añadir partido</h1></div><span className="match-step-indicator">0{step} / 03</span></div>
-      <Link className="pending-queue-link" to="/database?pending=true"><span className="pending-queue-icon"><Clock3 size={18} /></span><span><strong>Pendientes de subir</strong><small>Retoma un partido que aún no has valorado</small></span><ArrowRight size={18} aria-hidden="true" /></Link>
+      <PendingMatchesList compact />
       <div className="match-step-track" aria-hidden="true"><span style={{ width: `${step * 33.33}%` }} /></div>
 
       {step === 1 && <div className="match-step-content">
         <div className="step-title"><p>PASO 1</p><h2>¿Quién jugó?</h2><span>Elige competición y equipos.</span></div>
-        <EntitySearch label="Competición" placeholder="Buscar competición" value={competitionSearch} selected={competition} options={filteredCompetitions} loading={loadingCompetitions} error={!loadingCompetitions && !competitions.length ? error : ''} getOptionLabel={(item) => item.canonical_name} onChange={(value) => { setCompetitionSearch(value); setCompetitionId(''); setHomeTeam(null); setAwayTeam(null) }} onSelect={chooseCompetition} />
+        <EntitySearch label="Competición" placeholder="Toca para buscar una competición" value={competitionSearch} selected={competition} options={competitionSearchOpen ? filteredCompetitions : []} loading={loadingCompetitions} error={!loadingCompetitions && !competitions.length ? error : ''} getOptionLabel={(item) => item.canonical_name} onOpen={() => setCompetitionSearchOpen(true)} onFocus={() => setCompetitionSearchOpen(true)} onChange={(value) => { setCompetitionSearch(value); setCompetitionId(''); setHomeTeam(null); setAwayTeam(null); setCompetitionSearchOpen(true) }} onSelect={chooseCompetition} />
         {competition && <div className="selected-competition">{competition.canonical_name}</div>}
         <EntitySearch label="Local" placeholder={competition ? 'Buscar equipo local' : 'Elige una competición primero'} value={homeSearch} selected={homeTeam} options={homeOptions} loading={loadingHome} disabled={!competition} getOptionLabel={getDisplayName} onChange={(value) => { setHomeSearch(value); setHomeTeam(null) }} onSelect={(team) => { setHomeTeam(team); setHomeSearch(getDisplayName(team)) }} />
         <EntitySearch label="Visitante" placeholder={competition ? 'Buscar equipo visitante' : 'Elige una competición primero'} value={awaySearch} selected={awayTeam} options={awayOptions} loading={loadingAway} disabled={!competition} getOptionLabel={getDisplayName} onChange={(value) => { setAwaySearch(value); setAwayTeam(null) }} onSelect={(team) => { setAwayTeam(team); setAwaySearch(getDisplayName(team)) }} />

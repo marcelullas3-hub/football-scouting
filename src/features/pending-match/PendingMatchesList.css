@@ -1,0 +1,25 @@
+.pending-list { color: var(--text-h); }
+.pending-list-compact { margin: 0 0 20px; border-bottom: 1px solid var(--border); }
+.pending-list-compact > summary { min-height: 52px; display: flex; align-items: center; gap: 10px; list-style: none; cursor: pointer; }
+.pending-list-compact > summary::-webkit-details-marker { display: none; }
+.pending-list-compact > summary::after { width: 7px; height: 7px; margin-left: auto; border-right: 1.5px solid var(--text); border-bottom: 1.5px solid var(--text); content: ''; transform: rotate(45deg) translateY(-2px); transition: transform 150ms ease; }
+.pending-list-compact[open] > summary::after { transform: rotate(225deg) translate(-1px,-1px); }
+.pending-list-summary-icon { display: grid; width: 30px; aspect-ratio: 1; place-items: center; border-radius: 4px; background: var(--brand-blue-tint); color: var(--brand-blue); }
+.pending-list-compact summary strong { font-size: 13px; }
+.pending-list-count { min-width: 22px; padding: 2px 6px; border-radius: 10px; background: #edf0f5; color: var(--text); font-size: 11px; font-variant-numeric: tabular-nums; text-align: center; }
+.pending-list-content { padding: 0 0 12px 40px; }
+.pending-list-full { border-top: 1px solid var(--border); }
+.pending-list-rows { display: grid; }
+.pending-list-row { min-height: 68px; display: grid; grid-template-columns: 34px minmax(0,1fr) 18px; align-items: center; gap: 10px; padding: 10px 2px; border-bottom: 1px solid var(--border); color: var(--text-h); text-decoration: none; }
+.pending-list-row:hover .pending-list-copy strong { color: var(--brand-blue); }
+.pending-list-icon { display: grid; width: 32px; aspect-ratio: 1; place-items: center; border-radius: 4px; background: #fff1d7; color: #916300; }
+.pending-list-copy { min-width: 0; display: grid; gap: 3px; }
+.pending-list-copy strong { overflow: hidden; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+.pending-list-copy strong span { color: var(--brand-blue); font-size: 10px; }
+.pending-list-copy small { overflow: hidden; color: var(--text); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.pending-list-row > svg:last-child { color: var(--text); }
+.pending-list-message, .pending-list-error { padding: 16px 0; color: var(--text); font-size: 13px; }
+.pending-list-error { color: var(--danger); }
+.pending-list-more { display: inline-block; margin-top: 10px; color: var(--brand-blue); font-size: 12px; font-weight: 650; text-decoration: none; }
+.pending-list-more:hover { text-decoration: underline; }
+@media (max-width: 520px) { .pending-list-row { grid-template-columns: 30px minmax(0,1fr) 16px; gap: 8px; } .pending-list-copy strong { font-size: 12px; } }
