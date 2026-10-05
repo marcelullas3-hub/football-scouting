@@ -1,6 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import './App.css'
-import AddMatch from './features/add-match/AddMatch'
+import AddMatch from './features/add-match/MatchCreation'
 import PendingMatch from './features/pending-match/PendingMatch'
 import PendingMatchObservations from './features/pending-match/PendingMatchObservations'
 import RateMatch from './features/rate-match/RateMatch'
