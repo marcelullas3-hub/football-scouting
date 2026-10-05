@@ -171,23 +171,51 @@ export default function PendingDatabase() {
         setError(backendErrorMessage(requestError))
         return new Map()
       })
-      const { data, error: requestError } = await supabase.rpc('search_teams', {
-        term: query.trim(),
-        max_results: 10,
-        p_competition_type: filters.competitionType || null,
-        p_confederation: null,
-        p_age_category: null,
-        p_gender: null,
-        p_country_id: filters.countryId || null,
-        p_allow_reserve_teams: true,
-      })
-      if (requestError) setError(backendErrorMessage(requestError))
+      const observationRows = []
+      let observationOffset = 0
+      const observationPageSize = 1000
+      let observationError = null
+      while (true) {
+        const { data, error: requestError } = await supabase
+          .from('observations')
+          .select('team_id')
+          .not('team_id', 'is', null)
+          .order('team_id')
+          .range(observationOffset, observationOffset + observationPageSize - 1)
+        if (requestError) {
+          observationError = requestError
+          break
+        }
+        observationRows.push(...(data || []))
+        if (!data || data.length < observationPageSize) break
+        observationOffset += observationPageSize
+      }
+
+      const observedTeamIds = [...new Set(observationRows.map((row) => row.team_id).filter(Boolean))]
+      let observedTeams = []
+      if (!observationError && observedTeamIds.length) {
+        for (let index = 0; index < observedTeamIds.length; index += 100) {
+          let teamsRequest = supabase
+            .from('teams')
+            .select('team_id, canonical_name, country_id, team_type')
+            .in('team_id', observedTeamIds.slice(index, index + 100))
+          if (filters.countryId) teamsRequest = teamsRequest.eq('country_id', filters.countryId)
+          if (filters.competitionType) teamsRequest = teamsRequest.eq('team_type', filters.competitionType)
+          const { data, error: teamsError } = await teamsRequest
+          if (teamsError) {
+            observationError = teamsError
+            break
+          }
+          observedTeams.push(...(data || []))
+        }
+      }
+
+      if (observationError) setError(backendErrorMessage(observationError))
       else {
         const aggregateMap = await aggregatePromise
         const normalizedQuery = query.trim().toLocaleLowerCase()
-        const filtered = (data || []).filter((team) => {
+        const filtered = observedTeams.filter((team) => {
           if (normalizedQuery && !getDisplayName(team).toLocaleLowerCase().includes(normalizedQuery)) return false
-          if (filters.countryId && team.country_id !== filters.countryId) return false
           return true
         }).map((team) => ({ ...team, stats: aggregateMap.get(team.team_id) }))
         setResults(filtered.sort((first, second) => {
@@ -196,7 +224,7 @@ export default function PendingDatabase() {
           return secondValue - firstValue
         }).slice(0, 10))
       }
-      if (requestError) await aggregatePromise
+      if (observationError) await aggregatePromise
     } else if (category === 'matches') {
       const exact = filters.ratingMode === 'exact' && filters.ratingExact ? Number(filters.ratingExact) : null
       const minimum = filters.ratingMode === 'range' && filters.ratingMin ? Number(filters.ratingMin) : null
