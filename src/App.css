@@ -884,6 +884,38 @@
   border-top-color: var(--brand-blue);
 }
 
+.penalty-entry {
+  display: grid;
+  gap: 12px;
+  border: 1px solid var(--border);
+  padding: 14px;
+}
+
+.penalty-entry legend {
+  padding: 0 5px;
+  color: var(--text-h);
+  font-weight: 600;
+}
+
+.penalty-entry > label {
+  flex-direction: row;
+  align-items: center;
+}
+
+.penalty-score-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.penalty-score-fields label {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
 .closing-panel button {
   margin: 14px 10px 0 0;
 }
