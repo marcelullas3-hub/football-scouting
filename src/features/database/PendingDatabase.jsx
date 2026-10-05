@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { ArrowLeft, Database, Search, Users } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../../shared/supabaseClient'
@@ -20,6 +20,25 @@ function countryKey(country) { return country.country_id || country.id }
 function countryLabel(country) { return country.display_name || country.country_name || country.canonical_name || country.name || 'País' }
 function rating(row) { return row.overall_rating == null ? null : Number(row.overall_rating) }
 
+function getFilteredCompetitions(competitions, statsMap, filters, query) {
+  const normalizedQuery = query.trim().toLocaleLowerCase()
+  return sortFavoriteOptions(competitions.filter((item) => {
+    if (normalizedQuery && !`${item.canonical_name} ${item.display_name || ''}`.toLocaleLowerCase().includes(normalizedQuery)) return false
+    if (filters.scope === 'international' && item.scope !== 'international') return false
+    if (filters.scope === 'national' && item.scope !== 'national') return false
+    if (filters.countryId && item.country_id !== filters.countryId) return false
+    if (filters.competitionType && item.competition_type !== filters.competitionType) return false
+    return true
+  })).map((item) => ({ ...item, stats: statsMap.get(item.competition_id) }))
+    .filter((item) => Number(item.stats?.matches_total || 0) > 0)
+    .sort((first, second) => {
+      const firstValue = Number(filters.orderBy === 'rating' ? first.stats?.avg_rating_total : first.stats?.matches_total) || 0
+      const secondValue = Number(filters.orderBy === 'rating' ? second.stats?.avg_rating_total : second.stats?.matches_total) || 0
+      if (firstValue !== secondValue) return secondValue - firstValue
+      return (first.display_name || first.canonical_name).localeCompare(second.display_name || second.canonical_name)
+    })
+}
+
 function MatchResult({ match }) {
   return <article className="explorer-result explorer-match"><div className="explorer-result-main"><strong>{match.home_team_display_name || match.home_team_name || 'Local'} <span>vs</span> {match.away_team_display_name || match.away_team_name || 'Visitante'}</strong><small>{match.competition_name || 'Competición'} · {match.match_date || match.season || 'Fecha sin indicar'}</small></div><div className="explorer-result-meta">{match.status === 'pending' && <span className="explorer-status">Pendiente</span>}{rating(match) != null && <strong>{rating(match)}<small>/10</small></strong>}</div></article>
 }
@@ -37,8 +56,8 @@ export default function PendingDatabase() {
   const [competitions, setCompetitions] = useState([])
   const [seasons, setSeasons] = useState([])
   const [favoriteTeams, setFavoriteTeams] = useState([])
-  const [aggregateStats, setAggregateStats] = useState(new Map())
   const [results, setResults] = useState([])
+  const [resultSummary, setResultSummary] = useState(null)
   const [observationContexts, setObservationContexts] = useState(new Map())
   const [filters, setFilters] = useState({
     countryId: '',
@@ -53,6 +72,7 @@ export default function PendingDatabase() {
     ratingExact: '',
     ratingMode: 'range',
     position: '',
+    projectedPosition: '',
     potentialMin: '',
     performanceMin: '',
     projectedLevel: '',
@@ -86,23 +106,10 @@ export default function PendingDatabase() {
     return () => { active = false }
   }, [])
 
-  const visibleCompetitions = useMemo(() => {
-    const normalizedQuery = query.trim().toLocaleLowerCase()
-    return sortFavoriteOptions(competitions.filter((item) => {
-      if (normalizedQuery && !`${item.canonical_name} ${item.display_name || ''}`.toLocaleLowerCase().includes(normalizedQuery)) return false
-      if (filters.scope === 'international' && item.scope !== 'international') return false
-      if (filters.scope === 'national' && item.scope !== 'national') return false
-      if (filters.countryId && item.country_id !== filters.countryId) return false
-      if (filters.competitionType && item.competition_type !== filters.competitionType) return false
-      return true
-    })).map((item) => ({ ...item, stats: aggregateStats.get(item.competition_id) }))
-      .sort((first, second) => {
-        const firstValue = Number(filters.orderBy === 'rating' ? first.stats?.avg_rating_total : first.stats?.matches_total) || 0
-        const secondValue = Number(filters.orderBy === 'rating' ? second.stats?.avg_rating_total : second.stats?.matches_total) || 0
-        if (firstValue !== secondValue) return secondValue - firstValue
-        return (first.display_name || first.canonical_name).localeCompare(second.display_name || second.canonical_name)
-      })
-  }, [competitions, aggregateStats, filters, query])
+  useEffect(() => {
+    setResultSummary(null)
+    setResults([])
+  }, [filters, query])
 
   async function loadAggregateStats() {
     const pageSize = 100
@@ -155,7 +162,6 @@ export default function PendingDatabase() {
       matches_total: value.matches_total,
       avg_rating_total: value.rating_count ? value.rating_sum / value.rating_count : null,
     }]))
-    setAggregateStats(nextStats)
     return nextStats
   }
 
@@ -164,6 +170,7 @@ export default function PendingDatabase() {
     setLoading(true)
     setError('')
     setResults([])
+    setResultSummary(null)
     setObservationContexts(new Map())
 
     if (category === 'teams') {
@@ -178,9 +185,9 @@ export default function PendingDatabase() {
       while (true) {
         const { data, error: requestError } = await supabase
           .from('observations')
-          .select('team_id')
+          .select('observation_id, team_id, match_id')
           .not('team_id', 'is', null)
-          .order('team_id')
+          .order('observation_id')
           .range(observationOffset, observationOffset + observationPageSize - 1)
         if (requestError) {
           observationError = requestError
@@ -191,7 +198,33 @@ export default function PendingDatabase() {
         observationOffset += observationPageSize
       }
 
-      const observedTeamIds = [...new Set(observationRows.map((row) => row.team_id).filter(Boolean))]
+      let scopedObservations = observationRows
+      if (!observationError && (filters.competitionId || filters.season || filters.viewingMethod)) {
+        const observedMatchIds = [...new Set(observationRows.map((row) => row.match_id).filter(Boolean))]
+        const matchContexts = new Map()
+        for (let index = 0; index < observedMatchIds.length; index += 100) {
+          const { data, error: contextError } = await supabase
+            .from('v_match_context')
+            .select('match_id, competition_id, season, viewing_method')
+            .in('match_id', observedMatchIds.slice(index, index + 100))
+          if (contextError) {
+            observationError = contextError
+            break
+          }
+          for (const context of data || []) matchContexts.set(context.match_id, context)
+        }
+        if (!observationError) {
+          scopedObservations = observationRows.filter((observation) => {
+            const context = matchContexts.get(observation.match_id)
+            if (!context) return false
+            if (filters.competitionId && context.competition_id !== filters.competitionId) return false
+            if (filters.season && context.season !== filters.season) return false
+            if (filters.viewingMethod && context.viewing_method !== filters.viewingMethod) return false
+            return true
+          })
+        }
+      }
+      const observedTeamIds = [...new Set(scopedObservations.map((row) => row.team_id).filter(Boolean))]
       let observedTeams = []
       if (!observationError && observedTeamIds.length) {
         for (let index = 0; index < observedTeamIds.length; index += 100) {
@@ -223,61 +256,121 @@ export default function PendingDatabase() {
           const secondValue = Number(filters.orderBy === 'rating' ? second.stats?.avg_rating_total : second.stats?.matches_total) || 0
           return secondValue - firstValue
         }).slice(0, 10))
+        const matchedTeams = filtered
+        const matchesCount = matchedTeams.reduce((total, team) => total + Number(team.stats?.matches_total || 0), 0)
+        setResultSummary({ count: matchedTeams.length, label: 'equipos con observaciones', secondary: `${matchesCount} partidos con los filtros actuales` })
       }
       if (observationError) await aggregatePromise
     } else if (category === 'matches') {
       const exact = filters.ratingMode === 'exact' && filters.ratingExact ? Number(filters.ratingExact) : null
       const minimum = filters.ratingMode === 'range' && filters.ratingMin ? Number(filters.ratingMin) : null
       const maximum = filters.ratingMode === 'range' && filters.ratingMax ? Number(filters.ratingMax) : null
-      const { data, error: requestError } = await supabase.rpc('search_my_matches', {
-        p_competition_id: filters.competitionId || null,
-        p_season: filters.season || null,
-        p_team_id: filters.teamId || null,
-        p_country_id: filters.countryId || null,
-        p_rating_min: minimum,
-        p_rating_max: maximum,
-        p_rating_exact: exact,
-        p_include_pending: true,
-        p_order: 'date_desc',
-        p_limit: 100,
-        p_offset: 0,
-      })
-      if (requestError) setError(backendErrorMessage(requestError))
-      else setResults((data || []).filter((match) => !filters.viewingMethod || match.viewing_method === filters.viewingMethod))
-    } else if (category === 'observations') {
-      let request = supabase.from('observations').select('*').limit(500)
-      if (filters.teamId) request = request.eq('team_id', filters.teamId)
-      if (filters.position) request = request.contains('position_observed', [filters.position])
-      if (filters.projectedLevel) request = request.eq('projected_level', filters.projectedLevel)
-      if (filters.potentialMin) request = request.gte('potential', Number(filters.potentialMin))
-      if (filters.performanceMin) request = request.gte('performance_rating', Number(filters.performanceMin))
-      const { data, error: requestError } = await request
+      if (minimum != null && maximum != null && minimum > maximum) {
+        setError('La valoración mínima no puede superar la máxima.')
+        setLoading(false)
+        return
+      }
+      const matches = []
+      const pageSize = 100
+      let offset = 0
+      let totalCount = 0
+      let requestError = null
+      const normalizedQuery = query.trim().toLocaleLowerCase()
+      while (true) {
+        const response = await supabase.rpc('search_my_matches', {
+          p_competition_id: filters.competitionId || null,
+          p_season: filters.season || null,
+          p_team_id: filters.teamId || null,
+          p_country_id: filters.countryId || null,
+          p_rating_min: minimum,
+          p_rating_max: maximum,
+          p_rating_exact: exact,
+          p_include_pending: true,
+          p_order: 'date_desc',
+          p_limit: pageSize,
+          p_offset: offset,
+        })
+        if (response.error) {
+          requestError = response.error
+          break
+        }
+        const pageRows = response.data || []
+        if (offset === 0) totalCount = Number(pageRows[0]?.total_count || 0)
+        matches.push(...pageRows.filter((match) => {
+          if (filters.viewingMethod && match.viewing_method !== filters.viewingMethod) return false
+          if (!normalizedQuery) return true
+          return `${match.home_team_display_name || ''} ${match.away_team_display_name || ''} ${match.competition_name || ''} ${match.season || ''}`.toLocaleLowerCase().includes(normalizedQuery)
+        }))
+        offset += pageRows.length
+        if (!pageRows.length || pageRows.length < pageSize || offset >= totalCount) break
+      }
       if (requestError) setError(backendErrorMessage(requestError))
       else {
-        const matchIds = [...new Set((data || []).map((item) => item.match_id).filter(Boolean))]
+        const ratings = matches.map((match) => Number(match.overall_rating)).filter(Number.isFinite)
+        setResults(matches.slice(0, 10))
+        setResultSummary({
+          count: filters.viewingMethod || normalizedQuery ? matches.length : totalCount,
+          label: 'partidos que cumplen los filtros',
+          secondary: ratings.length ? `Media ${(ratings.reduce((sum, value) => sum + value, 0) / ratings.length).toLocaleString('es-ES', { maximumFractionDigits: 1 })} / 10` : 'Sin valoraciones todavía',
+        })
+      }
+    } else if (category === 'observations') {
+      const observationRows = []
+      let offset = 0
+      const pageSize = 1000
+      let requestError = null
+      while (true) {
+        let request = supabase.from('observations').select('*').order('observation_id').range(offset, offset + pageSize - 1)
+        if (filters.teamId) request = request.eq('team_id', filters.teamId)
+        if (filters.position) request = request.contains('position_observed', [filters.position])
+        if (filters.projectedPosition) request = request.contains('projected_position', [filters.projectedPosition])
+        if (filters.projectedLevel) request = request.eq('projected_level', filters.projectedLevel)
+        if (filters.potentialMin) request = request.gte('potential', Number(filters.potentialMin))
+        if (filters.performanceMin) request = request.gte('performance_rating', Number(filters.performanceMin))
+        const response = await request
+        if (response.error) {
+          requestError = response.error
+          break
+        }
+        observationRows.push(...(response.data || []))
+        if (!response.data || response.data.length < pageSize) break
+        offset += pageSize
+      }
+      if (requestError) setError(backendErrorMessage(requestError))
+      else {
+        const matchIds = [...new Set(observationRows.map((item) => item.match_id).filter(Boolean))]
         let contextMap = new Map()
-        if (matchIds.length) {
+        for (let index = 0; index < matchIds.length; index += 100) {
           const { data: contextData, error: contextError } = await supabase
             .from('v_match_context')
             .select('match_id, home_team_display_name, away_team_display_name, competition_id, season, viewing_method')
-            .in('match_id', matchIds)
+            .in('match_id', matchIds.slice(index, index + 100))
           if (contextError) setError(backendErrorMessage(contextError))
           else contextMap = new Map((contextData || []).map((item) => [item.match_id, item]))
         }
         const normalizedQuery = query.trim().toLocaleLowerCase()
-        const filtered = (data || []).filter((item) => {
+        const filtered = observationRows.filter((item) => {
           const context = contextMap.get(item.match_id)
-          if (normalizedQuery && !`${item.note || ''} ${item.dorsal || ''} ${item.position_observed || ''}`.toLocaleLowerCase().includes(normalizedQuery)) return false
+          const searchableObservation = `${item.note || ''} ${item.dorsal || ''} ${item.position_observed || ''} ${item.projected_position || ''} ${item.projected_level || ''} ${item.performance_rating || ''} ${item.potential || ''}`
+          if (normalizedQuery && !searchableObservation.toLocaleLowerCase().includes(normalizedQuery)) return false
           if (filters.competitionId && context?.competition_id !== filters.competitionId) return false
           if (filters.season && context?.season !== filters.season) return false
           if (filters.viewingMethod && context?.viewing_method !== filters.viewingMethod) return false
           return true
         })
         setResults(filtered.slice(0, 10))
+        setResultSummary({ count: filtered.length, label: 'observaciones que cumplen los filtros', secondary: `${new Set(filtered.map((item) => item.match_id)).size} partidos` })
         setObservationContexts(contextMap)
       }
     } else if (category === 'competitions') {
-      await loadAggregateStats().catch((requestError) => setError(backendErrorMessage(requestError)))
+      const aggregateMap = await loadAggregateStats().catch((requestError) => {
+        setError(backendErrorMessage(requestError))
+        return new Map()
+      })
+      const rows = getFilteredCompetitions(competitions, aggregateMap, filters, query)
+      const totalMatches = rows.reduce((total, item) => total + Number(item.stats?.matches_total || 0), 0)
+      setResults(rows.slice(0, 10))
+      setResultSummary({ count: rows.length, label: 'competiciones que cumplen los filtros', secondary: `${totalMatches} partidos en total` })
     }
     setLoading(false)
   }
@@ -295,11 +388,11 @@ export default function PendingDatabase() {
       <header className="database-explorer-heading"><span className="database-explorer-icon"><Database size={19} /></span><div><p>TU ARCHIVO</p><h1>Base de datos</h1></div></header>
 
       <nav className="database-categories" aria-label="Tipo de búsqueda">
-        {CATEGORIES.map(([id, label]) => <button key={id} type="button" className={category === id ? 'is-active' : ''} aria-pressed={category === id} onClick={() => { setCategory(id); setResults([]); setError('') }}>{label}</button>)}
+        {CATEGORIES.map(([id, label]) => <button key={id} type="button" className={category === id ? 'is-active' : ''} aria-pressed={category === id} onClick={() => { setCategory(id); setResults([]); setResultSummary(null); setError('') }}>{label}</button>)}
       </nav>
 
       <form className="database-search" onSubmit={runSearch}>
-        <label className="database-search-box"><Search size={18} /><input type="search" value={query} placeholder={`Buscar ${activeCategoryLabel?.toLocaleLowerCase() || ''}`} onChange={(event) => setQuery(event.target.value)} disabled={categoriesWithoutSearch} /><button type="submit" disabled={loading || categoriesWithoutSearch} aria-label="Buscar"><Search size={17} /></button></label>
+        <div className="database-search-box"><Search size={18} /><input aria-label={`Buscar ${activeCategoryLabel?.toLocaleLowerCase() || ''}`} type="search" value={query} placeholder={`Buscar ${activeCategoryLabel?.toLocaleLowerCase() || ''}`} onChange={(event) => setQuery(event.target.value)} disabled={categoriesWithoutSearch} /><button type="submit" disabled={loading || categoriesWithoutSearch} aria-label="Buscar"><Search size={17} /></button></div>
         {category !== 'players' && <div className="database-category-filters">
           {(category === 'matches' || category === 'observations') && <label>Equipo<select value={filters.teamId} onChange={(event) => setFilters((current) => ({ ...current, teamId: event.target.value }))}><option value="">Todos</option>{favoriteTeams.map((team) => <option key={team.team_id} value={team.team_id}>{getDisplayName(team)}</option>)}</select></label>}
           {(category === 'matches' || category === 'teams' || category === 'observations') && <label>Competición<select value={filters.competitionId} onChange={(event) => setFilters((current) => ({ ...current, competitionId: event.target.value }))}><option value="">Todas</option>{competitions.map((item) => <option key={item.competition_id} value={item.competition_id}>{item.display_name || item.canonical_name}</option>)}</select></label>}
@@ -309,7 +402,7 @@ export default function PendingDatabase() {
           {(category === 'competitions' || category === 'teams') && <label>{category === 'teams' ? 'Tipo' : 'Competición'}<select value={filters.competitionType} onChange={(event) => setFilters((current) => ({ ...current, competitionType: event.target.value }))}><option value="">Todos</option><option value="club">Clubes</option><option value="national">Selecciones</option></select></label>}
           {(category === 'matches' || category === 'teams' || category === 'competitions' || category === 'observations') && <label>Visionado<select value={filters.viewingMethod} onChange={(event) => setFilters((current) => ({ ...current, viewingMethod: event.target.value }))}><option value="">Todos</option><option value="in_person">En el campo</option><option value="screen">Pantalla</option></select></label>}
           {category === 'matches' && <fieldset className="database-rating-filter"><legend>Valoración</legend><div><label><input type="radio" checked={filters.ratingMode === 'range'} onChange={() => setFilters((current) => ({ ...current, ratingMode: 'range', ratingExact: '' }))} /> Rango</label><label><input type="radio" checked={filters.ratingMode === 'exact'} onChange={() => setFilters((current) => ({ ...current, ratingMode: 'exact', ratingMin: '', ratingMax: '' }))} /> Exacta</label></div>{filters.ratingMode === 'range' ? <><input aria-label="Valoración mínima" type="number" min="1" max="10" placeholder="Mín." value={filters.ratingMin} onChange={(event) => setFilters((current) => ({ ...current, ratingMin: event.target.value }))} /><input aria-label="Valoración máxima" type="number" min="1" max="10" placeholder="Máx." value={filters.ratingMax} onChange={(event) => setFilters((current) => ({ ...current, ratingMax: event.target.value }))} /></> : <input aria-label="Valoración exacta" type="number" min="1" max="10" placeholder="Exacta" value={filters.ratingExact} onChange={(event) => setFilters((current) => ({ ...current, ratingExact: event.target.value }))} />}</fieldset>}
-          {category === 'observations' && <><label>Posición<select value={filters.position} onChange={(event) => setFilters((current) => ({ ...current, position: event.target.value }))}><option value="">Todas</option>{POSITIONS.map((position) => <option key={position}>{position}</option>)}</select></label><label>Potencial mín.<input type="number" min="1" max="5" value={filters.potentialMin} onChange={(event) => setFilters((current) => ({ ...current, potentialMin: event.target.value }))} /></label><label>Rendimiento mín.<input type="number" min="1" max="10" value={filters.performanceMin} onChange={(event) => setFilters((current) => ({ ...current, performanceMin: event.target.value }))} /></label><label>Proyección<select value={filters.projectedLevel} onChange={(event) => setFilters((current) => ({ ...current, projectedLevel: event.target.value }))}><option value="">Todas</option>{PROJECTION_LEVELS.map((level) => <option key={level} value={level}>{level.replaceAll('_', ' ')}</option>)}</select></label></>}
+          {category === 'observations' && <><label>Posición observada<select value={filters.position} onChange={(event) => setFilters((current) => ({ ...current, position: event.target.value }))}><option value="">Todas</option>{POSITIONS.map((position) => <option key={position}>{position}</option>)}</select></label><label>Posición proyectada<select value={filters.projectedPosition} onChange={(event) => setFilters((current) => ({ ...current, projectedPosition: event.target.value }))}><option value="">Todas</option>{POSITIONS.map((position) => <option key={position}>{position}</option>)}</select></label><label>Potencial mín.<input type="number" min="1" max="5" value={filters.potentialMin} onChange={(event) => setFilters((current) => ({ ...current, potentialMin: event.target.value }))} /></label><label>Rendimiento mín.<input type="number" min="1" max="10" value={filters.performanceMin} onChange={(event) => setFilters((current) => ({ ...current, performanceMin: event.target.value }))} /></label><label>Proyección<select value={filters.projectedLevel} onChange={(event) => setFilters((current) => ({ ...current, projectedLevel: event.target.value }))}><option value="">Todas</option>{PROJECTION_LEVELS.map((level) => <option key={level} value={level}>{level.replaceAll('_', ' ')}</option>)}</select></label></>}
           {(category === 'teams' || category === 'competitions') && <label>Ordenar por<select value={filters.orderBy} onChange={(event) => setFilters((current) => ({ ...current, orderBy: event.target.value }))}><option value="matches">Partidos vistos</option><option value="rating">Valoración media</option></select></label>}
         </div>}
         <button className="database-search-submit" type="submit" disabled={loading || categoriesWithoutSearch}>{loading ? 'Buscando…' : `Buscar ${activeCategoryLabel?.toLocaleLowerCase() || ''}`}</button>
@@ -317,8 +410,9 @@ export default function PendingDatabase() {
 
       {category === 'players' ? <section className="database-not-supported"><Users size={23} /><h2>Jugadores</h2><p>Falta confirmar el contrato de lectura de jugadores completos: columnas de posición, nacionalidad, pie dominante, edad y criterio de completitud.</p></section> : <>
         {error && <p className="database-explorer-error" role="alert">{error}</p>}
+        {resultSummary && <section className="database-count-summary" aria-live="polite"><strong>{new Intl.NumberFormat('es-ES').format(resultSummary.count)}</strong><span>{resultSummary.label}</span><small>{resultSummary.secondary}</small></section>}
         <div className="database-explorer-results-heading"><h2>Primeros resultados</h2><span>Máximo 10</span></div>
-        {loadingOptions || loading ? <p className="database-explorer-empty">Cargando…</p> : category === 'matches' ? results.length ? <div className="database-explorer-list">{results.slice(0, 10).map((match, index) => <MatchResult key={match.match_id || index} match={match} />)}</div> : <p className="database-explorer-empty">No hay partidos para estos filtros.</p> : category === 'teams' ? results.length ? <div className="database-explorer-list">{results.slice(0, 10).map((team) => <article className="explorer-result" key={team.team_id}><div className="explorer-result-main"><strong>{getDisplayName(team)}</strong><small>{team.team_type || 'Equipo'}{team.country_name ? ` · ${team.country_name}` : ''}</small></div><div className="explorer-result-meta"><span>{team.stats?.matches_total ?? 0} partidos</span>{team.stats?.avg_rating_total != null && <strong>{Number(team.stats.avg_rating_total).toLocaleString('es-ES',{maximumFractionDigits:1})}<small>/10</small></strong>}</div></article>)}</div> : <p className="database-explorer-empty">Busca un equipo para ver resultados.</p> : category === 'competitions' ? visibleCompetitions.length ? <div className="database-explorer-list">{visibleCompetitions.slice(0, 10).map((item) => <article className="explorer-result" key={item.competition_id}><div className="explorer-result-main"><strong>{item.display_name || item.canonical_name}</strong><small>{item.scope === 'international' ? 'Internacional' : item.country_id ? countryLabel(countries.find((country) => countryKey(country) === item.country_id) || {}) : 'Nacional'}</small></div><div className="explorer-result-meta"><span>{item.stats?.matches_total ?? 0} partidos</span>{item.stats?.avg_rating_total != null && <strong>{Number(item.stats.avg_rating_total).toLocaleString('es-ES',{maximumFractionDigits:1})}<small>/10</small></strong>}</div></article>)}</div> : <p className="database-explorer-empty">No hay competiciones para estos filtros.</p> : results.length ? <div className="database-explorer-list">{results.map((item) => <ObservationResult key={item.observation_id} observation={item} context={observationContexts} />)}</div> : <p className="database-explorer-empty">No hay observaciones para estos filtros.</p>}
+        {loadingOptions || loading ? <p className="database-explorer-empty">Cargando…</p> : category === 'matches' ? results.length ? <div className="database-explorer-list">{results.slice(0, 10).map((match, index) => <MatchResult key={match.match_id || index} match={match} />)}</div> : <p className="database-explorer-empty">No hay partidos para estos filtros.</p> : category === 'teams' ? results.length ? <div className="database-explorer-list">{results.slice(0, 10).map((team) => <article className="explorer-result" key={team.team_id}><div className="explorer-result-main"><strong>{getDisplayName(team)}</strong><small>{team.team_type || 'Equipo'}{team.country_name ? ` · ${team.country_name}` : ''}</small></div><div className="explorer-result-meta"><span>{team.stats?.matches_total ?? 0} partidos</span>{team.stats?.avg_rating_total != null && <strong>{Number(team.stats.avg_rating_total).toLocaleString('es-ES',{maximumFractionDigits:1})}<small>/10</small></strong>}</div></article>)}</div> : <p className="database-explorer-empty">Busca un equipo para ver resultados.</p> : category === 'competitions' ? results.length ? <div className="database-explorer-list">{results.map((item) => <article className="explorer-result" key={item.competition_id}><div className="explorer-result-main"><strong>{item.display_name || item.canonical_name}</strong><small>{item.scope === 'international' ? 'Internacional' : item.country_id ? countryLabel(countries.find((country) => countryKey(country) === item.country_id) || {}) : 'Nacional'}</small></div><div className="explorer-result-meta"><span>{item.stats?.matches_total ?? 0} partidos</span>{item.stats?.avg_rating_total != null && <strong>{Number(item.stats.avg_rating_total).toLocaleString('es-ES',{maximumFractionDigits:1})}<small>/10</small></strong>}</div></article>)}</div> : <p className="database-explorer-empty">No hay competiciones con partidos para estos filtros.</p> : results.length ? <div className="database-explorer-list">{results.map((item) => <ObservationResult key={item.observation_id} observation={item} context={observationContexts} />)}</div> : <p className="database-explorer-empty">No hay observaciones para estos filtros.</p>}
       </>}
     </section>
   )
