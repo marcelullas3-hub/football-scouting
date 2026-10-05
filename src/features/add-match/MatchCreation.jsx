@@ -56,6 +56,7 @@ export default function MatchCreation() {
     const available = getPhaseOptions(competition?.available_phases)
     return available.length ? available : (competition && !friendly ? ['league_phase'] : [])
   }, [competition, friendly])
+  const showPhaseSelector = phaseOptions.length > 1
   const seasonOnlyMode = isDelayed && delayedMode === 'season'
   const finalSeason = seasonOnlyMode
     ? (seasonChoice === '__custom__' ? customSeason.trim() : seasonChoice)
@@ -240,12 +241,9 @@ export default function MatchCreation() {
 
   return (
     <section className="match-create-page">
-      <div className="match-create-heading"><div><p className="match-create-kicker">OPINBALL · SCOUTING</p><h1>Añadir partido</h1></div><span className="match-step-indicator">0{step} / 03</span></div>
-      <PendingMatchesList compact />
-      <div className="match-step-track" aria-hidden="true"><span style={{ width: `${step * 33.33}%` }} /></div>
+      <div className="match-create-heading"><h1>Añadir partido</h1></div>
 
       {step === 1 && <div className="match-step-content">
-        <div className="step-title"><p>PASO 1</p><h2>¿Quién jugó?</h2><span>Elige competición y equipos.</span></div>
         <EntitySearch label="Competición" placeholder="Toca para buscar una competición" value={competitionSearch} selected={competition} options={competitionSearchOpen ? filteredCompetitions : []} loading={loadingCompetitions} error={!loadingCompetitions && !competitions.length ? error : ''} getOptionLabel={(item) => item.canonical_name} onOpen={() => setCompetitionSearchOpen(true)} onFocus={() => setCompetitionSearchOpen(true)} onChange={(value) => { setCompetitionSearch(value); setCompetitionId(''); setHomeTeam(null); setAwayTeam(null); setCompetitionSearchOpen(true) }} onSelect={chooseCompetition} />
         {competition && <div className="selected-competition">{competition.canonical_name}</div>}
         <EntitySearch label="Local" placeholder={competition ? 'Buscar equipo local' : 'Elige una competición primero'} value={homeSearch} selected={homeTeam} options={homeOptions} loading={loadingHome} disabled={!competition} getOptionLabel={getDisplayName} onChange={(value) => { setHomeSearch(value); setHomeTeam(null) }} onSelect={(team) => { setHomeTeam(team); setHomeSearch(getDisplayName(team)) }} />
@@ -253,6 +251,7 @@ export default function MatchCreation() {
         {teamError && <p className="match-form-error" role="alert">{teamError}</p>}
         {error && <p className="match-form-error" role="alert">{error}</p>}
         <button className="match-primary-button" type="button" onClick={nextFromTeams}>Siguiente <ArrowRight size={18} /></button>
+        <PendingMatchesList compact />
       </div>}
 
       {step === 2 && <div className="match-step-content">
@@ -271,7 +270,7 @@ export default function MatchCreation() {
         {isDelayed && !friendly && <fieldset className="delayed-mode-options"><legend>¿Qué dato recuerdas?</legend><label><input type="radio" name="delayedMode" checked={delayedMode === 'date'} onChange={() => { setDelayedMode('date'); setMatchDate(''); setSeasonChoice(''); setCalculatedSeason('') }} /> Fecha exacta</label><label><input type="radio" name="delayedMode" checked={delayedMode === 'season'} onChange={() => { setDelayedMode('season'); setMatchDate(''); setSeasonChoice(''); setCalculatedSeason('') }} /> Solo temporada</label></fieldset>}
         {isDelayed && (friendly || delayedMode === 'date') && <label className="match-field">Fecha exacta<input type="date" min={MIN_DATE} max={TODAY} value={matchDate} onChange={(event) => setMatchDate(event.target.value)} required /></label>}
         {!isDelayed && <div className="match-current-date"><CalendarDays size={18} /><span>Hoy <strong>({new Intl.DateTimeFormat('es-ES', { dateStyle: 'long' }).format(new Date())})</strong></span></div>}
-        {!friendly && phaseOptions.length > 0 && <label className="match-field">Fase<select value={phase} onChange={(event) => setPhase(event.target.value)}>{phaseOptions.map((option) => <option key={option} value={option}>{option.replaceAll('_', ' ')}</option>)}</select></label>}
+        {!friendly && showPhaseSelector && <label className="match-field">Fase<select value={phase} onChange={(event) => setPhase(event.target.value)}>{phaseOptions.map((option) => <option key={option} value={option}>{option.replaceAll('_', ' ')}</option>)}</select></label>}
         {!friendly && seasonOnlyMode && <label className="match-field">Temporada<select value={seasonChoice} onChange={(event) => setSeasonChoice(event.target.value)} disabled={loadingSeasons}><option value="">{loadingSeasons ? 'Cargando temporadas…' : 'Seleccionar temporada'}</option>{seasonOptions.map((season) => <option key={season} value={season}>{season}</option>)}<option value="__custom__">Indicar otra temporada</option></select>{seasonChoice === '__custom__' && <input aria-label="Escribir temporada" placeholder="Ej. 2025/26" value={customSeason} onChange={(event) => setCustomSeason(event.target.value)} required />}</label>}
         {!friendly && !seasonOnlyMode && <div className="match-calculated-season"><span>Temporada</span><strong>{loadingSeasons ? 'Calculando…' : calculatedSeason || 'No disponible'}</strong></div>}
         {friendly && <p className="friendly-note">Amistoso · sin fase ni temporada</p>}
