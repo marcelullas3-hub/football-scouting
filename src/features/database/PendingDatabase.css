@@ -1,6 +1,48 @@
-.pending-database { width: min(100%, 900px); margin: 0 auto; color: var(--text-h); }
-.pending-database-heading { display: flex; align-items: center; gap: 13px; margin-bottom: 26px; }
-.pending-database-icon { display: grid; width: 42px; aspect-ratio: 1; place-items: center; border-radius: 5px; background: var(--brand-blue); color: #fff; }
-.pending-database-heading p { color: var(--brand-blue); font-size: 10px; font-weight: 800; letter-spacing: 1px; }
-.pending-database-heading h1 { margin: 3px 0 0; font-size: 32px; }
-@media (max-width: 520px) { .pending-database-heading h1 { font-size: 28px; } }
+.database-explorer { width: min(100%, 1040px); margin: 0 auto; color: var(--text-h); }
+.database-back { display: inline-flex; align-items: center; gap: 7px; margin-bottom: 17px; color: var(--text); font-size: 13px; font-weight: 600; text-decoration: none; }
+.database-back:hover { color: var(--brand-blue); }
+.database-explorer-heading { display: flex; align-items: center; gap: 12px; margin-bottom: 21px; }
+.database-explorer-icon { display: grid; width: 40px; aspect-ratio: 1; place-items: center; border-radius: 5px; background: var(--brand-blue); color: #fff; }
+.database-explorer-heading p { color: var(--brand-blue); font-size: 10px; font-weight: 800; letter-spacing: 1px; }
+.database-explorer-heading h1 { margin: 3px 0 0; font-size: 31px; }
+.database-categories { display: flex; gap: 4px; overflow-x: auto; border-bottom: 1px solid var(--border); scrollbar-width: thin; }
+.database-categories button { min-height: 45px; flex: 0 0 auto; padding: 0 13px; border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--text); font-size: 12px; font-weight: 650; cursor: pointer; }
+.database-categories button.is-active { border-bottom-color: var(--brand-blue); color: var(--brand-blue); }
+.database-search { display: grid; gap: 13px; padding: 17px 0 18px; border-bottom: 1px solid var(--border); }
+.database-search-box { min-height: 48px; display: flex; align-items: center; gap: 10px; padding: 0 10px 0 13px; border: 1px solid #d9deea; border-radius: 5px; background: #fff; color: #747d8d; }
+.database-search-box:focus-within { border-color: var(--brand-blue); box-shadow: 0 0 0 2px rgba(32,72,255,.1); }
+.database-search-box input { width: 100%; min-width: 0; border: 0; outline: 0; color: var(--text-h); font-size: 14px; }
+.database-search-box input::placeholder { color: #9299a8; }
+.database-search-box button { width: 32px; aspect-ratio: 1; display: grid; place-items: center; border: 0; border-radius: 4px; background: var(--brand-blue); color: #fff; cursor: pointer; }
+.database-search-box button:disabled { opacity: .5; cursor: default; }
+.database-category-filters { display: flex; flex-wrap: wrap; align-items: end; gap: 9px; }
+.database-category-filters > label { min-width: 135px; flex: 1 1 150px; display: grid; gap: 5px; color: var(--text-h); font-size: 11px; font-weight: 650; }
+.database-category-filters select, .database-category-filters > label > input { width: 100%; min-height: 38px; padding: 7px 9px; border: 1px solid #d9deea; border-radius: 4px; background: #fff; color: var(--text-h); font-size: 12px; font-weight: 450; }
+.database-category-filters select:focus-visible, .database-category-filters input:focus-visible { outline: 2px solid rgba(32,72,255,.3); border-color: var(--brand-blue); }
+.database-rating-filter { min-width: 190px; display: flex; flex-wrap: wrap; align-items: end; gap: 6px; margin: 0; padding: 0; border: 0; }
+.database-rating-filter legend { width: 100%; padding: 0 0 4px; color: var(--text-h); font-size: 11px; font-weight: 650; }
+.database-rating-filter > div { display: flex; gap: 8px; }
+.database-rating-filter > div label { display: flex; align-items: center; gap: 3px; color: var(--text); font-size: 10px; }
+.database-rating-filter input[type='radio'] { accent-color: var(--brand-blue); }
+.database-rating-filter > input { width: 70px; min-height: 34px; padding: 6px; border: 1px solid #d9deea; border-radius: 4px; font-size: 11px; }
+.database-search-submit { min-height: 39px; justify-self: end; display: inline-flex; align-items: center; justify-content: center; padding: 0 14px; border: 0; border-radius: 4px; background: var(--brand-blue); color: #fff; font-size: 12px; font-weight: 700; cursor: pointer; }
+.database-search-submit:disabled { opacity: .55; cursor: default; }
+.database-explorer-results-heading { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; padding: 19px 0 8px; }
+.database-explorer-results-heading h2 { margin: 0; font-size: 18px; }
+.database-explorer-results-heading span { color: var(--text); font-size: 11px; }
+.database-explorer-list { border-top: 1px solid var(--border); }
+.explorer-result { min-height: 68px; display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 10px 2px; border-bottom: 1px solid var(--border); }
+.explorer-result-main { min-width: 0; display: grid; gap: 3px; }
+.explorer-result-main strong { overflow: hidden; color: var(--text-h); font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+.explorer-result-main strong span { color: var(--brand-blue); font-size: 10px; }
+.explorer-result-main small { overflow: hidden; color: var(--text); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.explorer-result-meta { flex: 0 0 auto; display: flex; align-items: center; gap: 9px; color: var(--text); font-size: 11px; white-space: nowrap; }
+.explorer-result-meta > strong { color: var(--text-h); font-size: 13px; }
+.explorer-result-meta small { color: var(--text); font-size: 9px; font-weight: 450; }
+.explorer-status { padding: 3px 6px; border-radius: 3px; background: #fff1d7; color: #805900; font-size: 9px; font-weight: 700; }
+.database-explorer-empty { padding: 19px 0; color: var(--text); font-size: 13px; }
+.database-explorer-error { margin-top: 14px; padding: 10px 12px; border-left: 3px solid var(--danger); background: #fff2f0; color: #8e1d16; font-size: 12px; }
+.database-not-supported { min-height: 240px; display: grid; align-content: center; justify-items: start; gap: 10px; max-width: 580px; color: var(--brand-blue); }
+.database-not-supported h2 { margin: 0; color: var(--text-h); font-size: 19px; }
+.database-not-supported p { color: var(--text); font-size: 13px; }
+@media (max-width: 560px) { .database-explorer-heading h1 { font-size: 28px; } .database-categories button { padding-inline: 10px; } .database-category-filters > label { flex-basis: calc(50% - 6px); } .explorer-result-meta { font-size: 10px; } }
