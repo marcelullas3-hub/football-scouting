@@ -7,6 +7,7 @@ import RateMatch from './features/rate-match/RateMatch'
 import Login from './features/auth/Login'
 import PwaUpdateNotice from './features/auth/PwaUpdateNotice'
 import { AuthProvider, useAuth } from './shared/AuthContext'
+import AppLayout from './shared/AppLayout'
 
 function ProtectedRoute({ children }) {
   const { session, loading } = useAuth()
@@ -23,12 +24,14 @@ function AppRoutes() {
       <PwaUpdateNotice />
       <Routes>
         <Route path="/login" element={<Login />} />
-        <Route path="/" element={<Navigate to="/add-match" replace />} />
-        <Route path="/add-match" element={<ProtectedRoute><AddMatch /></ProtectedRoute>} />
-        <Route path="/match/:matchId/pending" element={<ProtectedRoute><PendingMatch /></ProtectedRoute>} />
-        <Route path="/match/:matchId/pending/observations" element={<ProtectedRoute><PendingMatchObservations /></ProtectedRoute>} />
-        <Route path="/match/:matchId/rate" element={<ProtectedRoute><RateMatch /></ProtectedRoute>} />
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
+          <Route path="/" element={<Navigate to="/add-match" replace />} />
+          <Route path="/add-match" element={<AddMatch />} />
+          <Route path="/match/:matchId/pending" element={<PendingMatch />} />
+          <Route path="/match/:matchId/pending/observations" element={<PendingMatchObservations />} />
+          <Route path="/match/:matchId/rate" element={<RateMatch />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Route>
       </Routes>
     </>
   )
