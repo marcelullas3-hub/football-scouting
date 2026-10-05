@@ -1,34 +1,45 @@
-import { BrowserRouter, Routes, Route, Link } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import './App.css'
 import AddMatch from './features/add-match/AddMatch'
 import PendingMatch from './features/pending-match/PendingMatch'
 import PendingMatchObservations from './features/pending-match/PendingMatchObservations'
 import RateMatch from './features/rate-match/RateMatch'
+import Login from './features/auth/Login'
+import PwaUpdateNotice from './features/auth/PwaUpdateNotice'
+import { AuthProvider, useAuth } from './shared/AuthContext'
 
-function Home() {
+function ProtectedRoute({ children }) {
+  const { session, loading } = useAuth()
+  const location = useLocation()
+
+  if (loading) return <main className="auth-loading">Cargando sesión…</main>
+  if (!session) return <Navigate to="/login" replace state={{ from: location }} />
+  return children
+}
+
+function AppRoutes() {
   return (
-    <main className="home">
-      <div className="home-content">
-        <h1>Opinball</h1>
-
-        <Link to="/add-match" className="btn btn-primary btn-block">
-          ＋ AÑADIR PARTIDO
-        </Link>
-      </div>
-    </main>
+    <>
+      <PwaUpdateNotice />
+      <Routes>
+        <Route path="/login" element={<Login />} />
+        <Route path="/" element={<Navigate to="/add-match" replace />} />
+        <Route path="/add-match" element={<ProtectedRoute><AddMatch /></ProtectedRoute>} />
+        <Route path="/match/:matchId/pending" element={<ProtectedRoute><PendingMatch /></ProtectedRoute>} />
+        <Route path="/match/:matchId/pending/observations" element={<ProtectedRoute><PendingMatchObservations /></ProtectedRoute>} />
+        <Route path="/match/:matchId/rate" element={<ProtectedRoute><RateMatch /></ProtectedRoute>} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </>
   )
 }
 
 function App() {
   return (
     <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/add-match" element={<AddMatch />} />
-        <Route path="/match/:matchId/pending" element={<PendingMatch />} />
-        <Route path="/match/:matchId/pending/observations" element={<PendingMatchObservations />} />
-        <Route path="/match/:matchId/rate" element={<RateMatch />} />
-      </Routes>
+      <AuthProvider>
+        <AppRoutes />
+      </AuthProvider>
     </BrowserRouter>
   )
 }
