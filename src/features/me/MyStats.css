@@ -1,4 +1,6 @@
 .my-stats { width: min(100%, 900px); margin: 0 auto; color: var(--text-h); }
+.stats-back-link { display: inline-flex; align-items: center; gap: 7px; margin-bottom: 18px; color: var(--text); font-size: 13px; font-weight: 600; text-decoration: none; }
+.stats-back-link:hover { color: var(--brand-blue); }
 .stats-heading { margin-bottom: 25px; }
 .stats-heading h1 { margin: 5px 0 6px; font-size: 36px; }
 .stats-heading > p:last-child { color: var(--text); font-size: 14px; }
@@ -27,6 +29,7 @@
 .stats-breakdown-row dt { color: var(--text); font-size: 11px; text-transform: capitalize; }
 .stats-breakdown-row dd { margin: 0; color: var(--text-h); font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .stats-empty, .stats-loading { padding: 18px 0; color: var(--text); font-size: 14px; }
+.stats-row-empty { align-self: center; color: var(--text); font-size: 12px; }
 .stats-loading { display: flex; align-items: center; gap: 9px; }
 .stats-spinner { animation: stats-spin 1s linear infinite; }
 .stats-error { margin-top: 16px; padding: 10px 12px; border-left: 3px solid var(--danger); background: #fff2f0; color: #8e1d16; font-size: 13px; }
