@@ -8,10 +8,16 @@ import { getDisplayName, getPhaseOptions, getSeasonValues, isFriendlyCompetition
 import './AddMatch.css'
 
 const MIN_DATE = '1850-01-01'
-const TODAY = (() => {
+function localDateISO(daysAgo = 0) {
   const date = new Date()
+  date.setDate(date.getDate() - daysAgo)
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
-})()
+}
+
+function formatLongDate(iso) {
+  const [year, month, day] = iso.split('-').map(Number)
+  return new Intl.DateTimeFormat('es-ES', { dateStyle: 'long' }).format(new Date(year, month - 1, day))
+}
 
 function errorMessage(error) {
   if (error?.code === '23505') return 'Ya registraste este partido.'
@@ -38,6 +44,7 @@ export default function MatchCreation() {
   const [isDelayed, setIsDelayed] = useState(false)
   const [delayedMode, setDelayedMode] = useState('')
   const [matchDate, setMatchDate] = useState('')
+  const [lateNight, setLateNight] = useState(false)
   const [seasonOptions, setSeasonOptions] = useState([])
   const [seasonChoice, setSeasonChoice] = useState('')
   const [customSeason, setCustomSeason] = useState('')
@@ -183,7 +190,9 @@ export default function MatchCreation() {
     setViewingMethod(method)
     setIsDelayed(method === 'delayed')
     setDelayedMode(method === 'delayed' && !friendly ? '' : 'date')
-    setMatchDate(method === 'delayed' ? '' : TODAY)
+    const isLateNight = method !== 'delayed' && new Date().getHours() < 6
+    setLateNight(isLateNight)
+    setMatchDate(method === 'delayed' ? '' : localDateISO(isLateNight ? 1 : 0))
     setSeasonChoice('')
     setCustomSeason('')
     setCalculatedSeason('')
@@ -195,7 +204,7 @@ export default function MatchCreation() {
     if (!viewingMethod) return 'Elige cómo viste el partido.'
     if (friendly && (!matchDate || delayedMode !== 'date')) return 'Los amistosos necesitan una fecha exacta.'
     if (isDelayed && !delayedMode) return 'Indica la fecha exacta o la temporada.'
-    if (delayedMode === 'date' && (!matchDate || matchDate < MIN_DATE || matchDate > TODAY)) return 'La fecha debe estar entre el 1 de enero de 1850 y hoy.'
+    if (delayedMode === 'date' && (!matchDate || matchDate < MIN_DATE || matchDate > localDateISO())) return 'La fecha debe estar entre el 1 de enero de 1850 y hoy.'
     if (!friendly && !seasonOnlyMode && !finalSeason) return 'No se pudo calcular la temporada para esta fecha.'
     if (!friendly && seasonOnlyMode && !finalSeason) return 'Indica la temporada del partido.'
     return ''
@@ -268,8 +277,9 @@ export default function MatchCreation() {
       {step === 3 && <form className="match-step-content" onSubmit={saveMatch}>
         <div className="step-title"><p>PASO 3</p><h2>Detalles del partido</h2><span>{getDisplayName(homeTeam)} vs {getDisplayName(awayTeam)}</span></div>
         {isDelayed && !friendly && <fieldset className="delayed-mode-options"><legend>¿Qué dato recuerdas?</legend><label><input type="radio" name="delayedMode" checked={delayedMode === 'date'} onChange={() => { setDelayedMode('date'); setMatchDate(''); setSeasonChoice(''); setCalculatedSeason('') }} /> Fecha exacta</label><label><input type="radio" name="delayedMode" checked={delayedMode === 'season'} onChange={() => { setDelayedMode('season'); setMatchDate(''); setSeasonChoice(''); setCalculatedSeason('') }} /> Solo temporada</label></fieldset>}
-        {isDelayed && (friendly || delayedMode === 'date') && <label className="match-field">Fecha exacta<input type="date" min={MIN_DATE} max={TODAY} value={matchDate} onChange={(event) => setMatchDate(event.target.value)} required /></label>}
-        {!isDelayed && <div className="match-current-date"><CalendarDays size={18} /><span>Hoy <strong>({new Intl.DateTimeFormat('es-ES', { dateStyle: 'long' }).format(new Date())})</strong></span></div>}
+        {isDelayed && (friendly || delayedMode === 'date') && <label className="match-field">Fecha exacta<input type="date" min={MIN_DATE} max={localDateISO()} value={matchDate} onChange={(event) => setMatchDate(event.target.value)} required /></label>}
+        {!isDelayed && !lateNight && <div className="match-current-date"><CalendarDays size={18} /><span>Hoy <strong>({formatLongDate(localDateISO())})</strong></span></div>}
+        {!isDelayed && lateNight && <fieldset className="delayed-mode-options"><legend>¿Qué día empezó el partido?</legend><label><input type="radio" name="lateNightDate" checked={matchDate === localDateISO(1)} onChange={() => setMatchDate(localDateISO(1))} /> Ayer ({formatLongDate(localDateISO(1))})</label><label><input type="radio" name="lateNightDate" checked={matchDate === localDateISO()} onChange={() => setMatchDate(localDateISO())} /> Hoy ({formatLongDate(localDateISO())})</label></fieldset>}
         {!friendly && showPhaseSelector && <label className="match-field">Fase<select value={phase} onChange={(event) => setPhase(event.target.value)}>{phaseOptions.map((option) => <option key={option} value={option}>{option.replaceAll('_', ' ')}</option>)}</select></label>}
         {!friendly && seasonOnlyMode && <label className="match-field">Temporada<select value={seasonChoice} onChange={(event) => setSeasonChoice(event.target.value)} disabled={loadingSeasons}><option value="">{loadingSeasons ? 'Cargando temporadas…' : 'Seleccionar temporada'}</option>{seasonOptions.map((season) => <option key={season} value={season}>{season}</option>)}<option value="__custom__">Indicar otra temporada</option></select>{seasonChoice === '__custom__' && <input aria-label="Escribir temporada" placeholder="Ej. 2025/26" value={customSeason} onChange={(event) => setCustomSeason(event.target.value)} required />}</label>}
         {!friendly && !seasonOnlyMode && <div className="match-calculated-season"><span>Temporada</span><strong>{loadingSeasons ? 'Calculando…' : calculatedSeason || 'No disponible'}</strong></div>}
