@@ -9,7 +9,7 @@
 .me-section-icon, .me-shortcut-icon { display: grid; width: 38px; aspect-ratio: 1; place-items: center; border-radius: 5px; background: #e9eeff; color: var(--brand-blue); }
 .me-metric-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); border-top: 1px solid var(--border); border-left: 1px solid var(--border); }
 .me-metric { min-height: 98px; display: flex; flex-direction: column; justify-content: space-between; gap: 10px; padding: 14px; border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); background: #fff; }
-.me-metric > span { color: var(--text); font-size: 12px; text-transform: capitalize; }
+.me-metric > span { color: var(--text); font-size: 12px; }
 .me-metric strong { color: var(--text-h); font-family: var(--heading); font-size: 29px; line-height: 1; font-variant-numeric: tabular-nums; }
 .me-empty { padding: 19px 0; color: var(--text); font-size: 14px; }
 .me-loading { display: flex; align-items: center; gap: 9px; padding: 18px 0; color: var(--text); font-size: 14px; }
