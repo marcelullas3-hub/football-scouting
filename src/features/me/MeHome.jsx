@@ -3,6 +3,7 @@ import { ArrowUpRight, BarChart3, Database, Heart, LoaderCircle } from 'lucide-r
 import { Link } from 'react-router-dom'
 import { supabase } from '../../shared/supabaseClient'
 import { backendErrorMessage } from '../../shared/backendErrorMessage'
+import { statLabel } from '../../shared/statLabels'
 import './MeHome.css'
 
 function normalizeSummary(data) {
@@ -15,10 +16,14 @@ function normalizeSummary(data) {
   return Object.assign({}, ...data)
 }
 
+const LABEL_ONLY_KEYS = ['current_season', 'current_year']
+
 function toMetrics(summary) {
+  const context = { currentSeason: summary.current_season, currentYear: summary.current_year }
   return Object.entries(summary)
+    .filter(([key]) => !LABEL_ONLY_KEYS.includes(key))
     .filter(([, value]) => typeof value === 'number' || (typeof value === 'string' && value.trim() !== '' && Number.isFinite(Number(value))))
-    .map(([key, value]) => ({ key, label: key.replaceAll('_', ' '), value: Number(value) }))
+    .map(([key, value]) => ({ key, label: statLabel(key, context), value: Number(value) }))
 }
 
 function formatMetric(value) {
@@ -62,7 +67,7 @@ export default function MeHome() {
         <>
           <section className="me-metric-section" aria-labelledby="activity-heading">
             <div className="me-section-heading"><div><p className="me-eyebrow">EN EL CAMPO</p><h2 id="activity-heading">Actuaciones</h2></div><span className="me-section-icon"><BarChart3 size={19} /></span></div>
-            {activity.length ? <div className="me-metric-grid">{activity.map(({ key, label, value }) => <article className="me-metric" key={key}><span>{label.replace(/^observations\s*/, '') || 'total'}</span><strong>{formatMetric(value)}</strong></article>)}</div> : <p className="me-empty">Todavía no hay actuaciones registradas.</p>}
+            {activity.length ? <div className="me-metric-grid">{activity.map(({ key, label, value }) => <article className="me-metric" key={key}><span>{label}</span><strong>{formatMetric(value)}</strong></article>)}</div> : <p className="me-empty">Todavía no hay actuaciones registradas.</p>}
           </section>
 
           {overview.length > 0 && <section className="me-metric-section" aria-label="Resumen"><div className="me-section-heading"><div><p className="me-eyebrow">RESUMEN</p><h2>Partidos</h2></div></div><div className="me-metric-grid">{overview.map(({ key, label, value }) => <article className="me-metric" key={key}><span>{label}</span><strong>{formatMetric(value)}</strong></article>)}</div></section>}

@@ -3,6 +3,7 @@ import { ArrowLeft, BarChart3, LoaderCircle, Trophy } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../../shared/supabaseClient'
 import { backendErrorMessage } from '../../shared/backendErrorMessage'
+import { statLabel } from '../../shared/statLabels'
 import './MyStats.css'
 
 const SCOPES = [
@@ -12,11 +13,12 @@ const SCOPES = [
 ]
 
 function numericMetrics(row, { includeObservations = true } = {}) {
+  const context = { currentSeason: row.current_season, currentYear: row.current_year }
   return Object.entries(row)
     .filter(([key, value]) => !key.endsWith('_id') && (typeof value === 'number' || (typeof value === 'string' && value.trim() !== '' && Number.isFinite(Number(value)))))
-    .filter(([key]) => !['scope', 'favorite_position'].includes(key))
+    .filter(([key]) => !['scope', 'favorite_position', 'current_season', 'current_year'].includes(key))
     .filter(([key]) => includeObservations || !key.startsWith('observations_'))
-    .map(([key, value]) => ({ key, label: key.replaceAll('_', ' '), value: Number(value) }))
+    .map(([key, value]) => ({ key, label: statLabel(key, context), value: Number(value) }))
 }
 
 function rowName(row, scope, favoriteNames) {
