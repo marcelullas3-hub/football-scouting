@@ -17,7 +17,14 @@
 --    Las 44 observaciones son de partidos finalizados; el trigger
 --    prevent_finalized_observation_update lo permite porque finalized_correction_active()
 --    es true (flag 'on' + current_user = 'postgres'). Se registra una fila por cambio.
+--
+--    OJO: 2 de las observaciones vinculadas NO tienen position_observed. El CHECK
+--    observations_position_observed_not_empty (NOT VALID) SI se evalua en las filas que
+--    se hacen UPDATE, asi que se retira durante el backfill y se vuelve a crear (NOT VALID)
+--    al terminar, sin validar el historico.
 -- ---------------------------------------------------------------------------
+alter table public.observations drop constraint observations_position_observed_not_empty;
+
 select set_config('app.finalized_correction', 'on', true);
 
 with upd as (
@@ -36,6 +43,12 @@ select 'observations', u.observation_id, 'player_id', null, to_jsonb(u.new_playe
 from upd u;
 
 select set_config('app.finalized_correction', 'off', true);
+
+alter table public.observations add constraint observations_position_observed_not_empty
+  check (position_observed is not null
+         and jsonb_typeof(position_observed) = 'array'
+         and jsonb_array_length(position_observed) >= 1)
+  not valid;
 
 -- ---------------------------------------------------------------------------
 -- 2) Duplicados imposibles (0 duplicados confirmados en produccion).
@@ -78,7 +91,7 @@ language sql stable set search_path = public, pg_temp as $$
     from my_obs, lateral jsonb_array_elements_text(coalesce(position_observed, '[]'::jsonb)) elem
     group by final_player_id
   )
-  select r.final_player_id, pl.canonical_name, r.dorsal,
+  select r.final_player_id, pl.canonical_name, r.dorsal::integer,
          coalesce(pos.positions, '[]'::jsonb), c.observations_count, c.last_observation_date
   from ranked r
   join public.players pl on pl.player_id = r.final_player_id
