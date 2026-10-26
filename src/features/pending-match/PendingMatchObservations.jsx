@@ -21,9 +21,9 @@ const EMPTY_FORM = {
   team_id: '',
   dorsal: '',
   position_observed: [],
-  performance_rating: 5,
-  potential: 3,
-  projected_level: 'first_division',
+  performance_rating: '',
+  potential: '',
+  projected_level: '',
   projected_position: [],
   note: '',
 }
@@ -40,6 +40,8 @@ function PendingMatchObservations() {
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [projectedPositionOpen, setProjectedPositionOpen] = useState(false)
+  const [performanceOpen, setPerformanceOpen] = useState(false)
+  const [potentialOpen, setPotentialOpen] = useState(false)
 
   async function loadData() {
     if (!matchId) return
@@ -84,6 +86,18 @@ function PendingMatchObservations() {
       : [...form[field], code])
   }
 
+  function togglePerformance() {
+    const next = !performanceOpen
+    setPerformanceOpen(next)
+    updateForm('performance_rating', next ? 5 : '')
+  }
+
+  function togglePotential() {
+    const next = !potentialOpen
+    setPotentialOpen(next)
+    updateForm('potential', next ? 3 : '')
+  }
+
   async function saveObservation(event) {
     event.preventDefault()
     if (!form.team_id || !form.dorsal || !form.position_observed.length) {
@@ -109,9 +123,9 @@ function PendingMatchObservations() {
       team_id: form.team_id,
       dorsal: Number(form.dorsal),
       position_observed: form.position_observed,
-      performance_rating: Number(form.performance_rating),
-      potential: Number(form.potential),
-      projected_level: form.projected_level,
+      performance_rating: form.performance_rating === '' ? null : Number(form.performance_rating),
+      potential: form.potential === '' ? null : Number(form.potential),
+      projected_level: form.projected_level || null,
       projected_position: form.projected_position.length ? form.projected_position : null,
       note: form.note.trim() || null,
     }
@@ -128,6 +142,8 @@ function PendingMatchObservations() {
       setForm(EMPTY_FORM)
       setEditingId(null)
       setProjectedPositionOpen(false)
+      setPerformanceOpen(false)
+      setPotentialOpen(false)
       await loadData()
     }
     setSaving(false)
@@ -139,13 +155,15 @@ function PendingMatchObservations() {
       team_id: observation.team_id,
       dorsal: observation.dorsal,
       position_observed: observation.position_observed || [],
-      performance_rating: observation.performance_rating ?? 5,
-      potential: observation.potential ?? 3,
-      projected_level: observation.projected_level || 'first_division',
+      performance_rating: observation.performance_rating ?? '',
+      potential: observation.potential ?? '',
+      projected_level: observation.projected_level || '',
       projected_position: observation.projected_position || [],
       note: observation.note || '',
     })
     setProjectedPositionOpen(Boolean(observation.projected_position?.length))
+    setPerformanceOpen(observation.performance_rating != null)
+    setPotentialOpen(observation.potential != null)
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
@@ -192,18 +210,24 @@ function PendingMatchObservations() {
             <div className="form-grid">
               <label>Equipo<select value={form.team_id} onChange={(event) => updateForm('team_id', event.target.value)}><option value="">Seleccionar equipo</option>{teamOptions.map(([id, name]) => <option key={id} value={id}>{name}</option>)}</select></label>
               <label>Dorsal<input type="number" min="1" max="99" step="1" value={form.dorsal} onChange={(event) => updateForm('dorsal', event.target.value)} /></label>
-              <label>Rendimiento: {form.performance_rating}/10<input type="range" min="1" max="10" step="1" value={form.performance_rating} onChange={(event) => updateForm('performance_rating', event.target.value)} /></label>
-              <label>Potencial: {form.potential}/5 ⭐<input type="range" min="1" max="5" step="1" value={form.potential} onChange={(event) => updateForm('potential', event.target.value)} /></label>
-              <label>Proyección<select value={form.projected_level} onChange={(event) => updateForm('projected_level', event.target.value)}>{PROJECTED_LEVELS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+              <label>Proyección (opcional)<select value={form.projected_level} onChange={(event) => updateForm('projected_level', event.target.value)}><option value="">Sin indicar</option>{PROJECTED_LEVELS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
             </div>
             <PositionPicker label="Posición observada" field="position_observed" values={form.position_observed} onToggle={togglePosition} />
+            <button className="btn-secondary" type="button" onClick={togglePerformance}>
+              {performanceOpen ? 'Quitar rendimiento' : '+ Añadir rendimiento'}
+            </button>
+            {performanceOpen && <label className="optional-slider">Rendimiento: {form.performance_rating || 5}/10<input type="range" min="1" max="10" step="1" value={form.performance_rating || 5} onChange={(event) => updateForm('performance_rating', event.target.value)} /></label>}
+            <button className="btn-secondary" type="button" onClick={togglePotential}>
+              {potentialOpen ? 'Quitar potencial' : '+ Añadir potencial'}
+            </button>
+            {potentialOpen && <label className="optional-slider">Potencial: {form.potential || 3}/5 ⭐<input type="range" min="1" max="5" step="1" value={form.potential || 3} onChange={(event) => updateForm('potential', event.target.value)} /></label>}
             <button className="btn-secondary" type="button" onClick={() => setProjectedPositionOpen((current) => !current)}>
               {projectedPositionOpen ? 'Ocultar posición proyectada' : '+ Añadir posición proyectada'}
             </button>
             {projectedPositionOpen && <PositionPicker label="Posición proyectada" field="projected_position" values={form.projected_position} onToggle={togglePosition} />}
             <label>Nota libre<textarea rows="3" value={form.note} onChange={(event) => updateForm('note', event.target.value)} /></label>
             <button className="btn-primary" type="submit" disabled={saving}>{saving ? 'Guardando...' : editingId ? 'Actualizar observación' : 'Registrar observación'}</button>
-            {editingId && <button className="btn-secondary" type="button" onClick={() => { setEditingId(null); setForm(EMPTY_FORM); setProjectedPositionOpen(false) }}>Cancelar edición</button>}
+            {editingId && <button className="btn-secondary" type="button" onClick={() => { setEditingId(null); setForm(EMPTY_FORM); setProjectedPositionOpen(false); setPerformanceOpen(false); setPotentialOpen(false) }}>Cancelar edición</button>}
           </form>
       </section>
 
