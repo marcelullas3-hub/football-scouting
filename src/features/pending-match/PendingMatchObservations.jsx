@@ -19,11 +19,12 @@ const POSITION_CODES = [
 
 const EMPTY_FORM = {
   team_id: '',
+  player_id: '',
   dorsal: '',
   position_observed: [],
-  performance_rating: 5,
-  potential: 3,
-  projected_level: 'first_division',
+  performance_rating: '',
+  potential: '',
+  projected_level: '',
   projected_position: [],
   note: '',
 }
@@ -40,6 +41,16 @@ function PendingMatchObservations() {
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [projectedPositionOpen, setProjectedPositionOpen] = useState(false)
+  const [performanceOpen, setPerformanceOpen] = useState(false)
+  const [potentialOpen, setPotentialOpen] = useState(false)
+  const [suggested, setSuggested] = useState([])
+  const [loadingSuggested, setLoadingSuggested] = useState(false)
+  const [linkedPlayer, setLinkedPlayer] = useState(null)
+  const [newPlayerOpen, setNewPlayerOpen] = useState(false)
+  const [newPlayerName, setNewPlayerName] = useState('')
+  const [similar, setSimilar] = useState([])
+  const [loadingSimilar, setLoadingSimilar] = useState(false)
+  const [creatingPlayer, setCreatingPlayer] = useState(false)
 
   async function loadData() {
     if (!matchId) return
@@ -67,6 +78,40 @@ function PendingMatchObservations() {
     }
   }, [context, navigate])
 
+  useEffect(() => {
+    if (!form.team_id) {
+      setSuggested([])
+      setLoadingSuggested(false)
+      return undefined
+    }
+    let active = true
+    setLoadingSuggested(true)
+    supabase.rpc('get_team_suggested_players', { p_team_id: form.team_id }).then(({ data, error: requestError }) => {
+      if (!active) return
+      if (!requestError) setSuggested(data || [])
+      setLoadingSuggested(false)
+    })
+    return () => { active = false }
+  }, [form.team_id])
+
+  useEffect(() => {
+    const term = newPlayerName.trim()
+    if (!newPlayerOpen || term.length < 2) {
+      setSimilar([])
+      setLoadingSimilar(false)
+      return undefined
+    }
+    let active = true
+    const timer = setTimeout(async () => {
+      setLoadingSimilar(true)
+      const { data, error: requestError } = await supabase.rpc('search_similar_players', { p_name: term })
+      if (!active) return
+      if (!requestError) setSimilar(data || [])
+      setLoadingSimilar(false)
+    }, 250)
+    return () => { active = false; clearTimeout(timer) }
+  }, [newPlayerOpen, newPlayerName])
+
   function updateForm(field, value) {
     setForm((current) => ({ ...current, [field]: value }))
     setError('')
@@ -84,21 +129,72 @@ function PendingMatchObservations() {
       : [...form[field], code])
   }
 
+  function togglePerformance() {
+    const next = !performanceOpen
+    setPerformanceOpen(next)
+    updateForm('performance_rating', next ? 5 : '')
+  }
+
+  function togglePotential() {
+    const next = !potentialOpen
+    setPotentialOpen(next)
+    updateForm('potential', next ? 3 : '')
+  }
+
+  function linkPlayer(player, { prefill = false } = {}) {
+    setLinkedPlayer({ player_id: player.player_id, canonical_name: player.canonical_name })
+    setForm((current) => ({
+      ...current,
+      player_id: player.player_id,
+      dorsal: prefill && player.last_dorsal != null && current.dorsal === '' ? String(player.last_dorsal) : current.dorsal,
+      position_observed: prefill && player.positions?.length && !current.position_observed.length ? player.positions : current.position_observed,
+    }))
+    setNewPlayerOpen(false)
+    setNewPlayerName('')
+    setSimilar([])
+    setError('')
+    setNotice('')
+  }
+
+  function unlinkPlayer() {
+    setLinkedPlayer(null)
+    setForm((current) => ({ ...current, player_id: '' }))
+    setNotice('')
+  }
+
+  async function createAndLink() {
+    const name = newPlayerName.trim()
+    if (name.length < 2) {
+      setError('Escribe el nombre del jugador (al menos 2 caracteres).')
+      return
+    }
+    setCreatingPlayer(true)
+    setError('')
+    const { data, error: requestError } = await supabase.rpc('create_player', { p_name: name })
+    setCreatingPlayer(false)
+    if (requestError) {
+      setError(requestError.message)
+      return
+    }
+    linkPlayer({ player_id: data, canonical_name: name })
+  }
+
   async function saveObservation(event) {
     event.preventDefault()
-    if (!form.team_id || !form.dorsal || !form.position_observed.length) {
-      setError('Completa equipo, dorsal y la posición observada.')
+    if (!form.team_id || !form.position_observed.length || (!form.player_id && !form.dorsal)) {
+      setError('Completa equipo, la posición observada y vincula un jugador o indica el dorsal.')
       return
     }
 
-    const duplicateObservation = observations.some((observation) => (
-      observation.observation_id !== editingId &&
-      observation.team_id === form.team_id &&
-      Number(observation.dorsal) === Number(form.dorsal)
-    ))
+    const duplicateObservation = observations.some((observation) => {
+      if (observation.observation_id === editingId) return false
+      if (form.player_id && observation.player_id === form.player_id) return true
+      if (form.dorsal !== '' && observation.team_id === form.team_id && Number(observation.dorsal) === Number(form.dorsal)) return true
+      return false
+    })
 
     if (duplicateObservation) {
-      setError('Ya existe una observación para ese equipo y dorsal en este partido.')
+      setError('Ya existe una observación con ese jugador o ese dorsal en este partido.')
       return
     }
 
@@ -107,11 +203,12 @@ function PendingMatchObservations() {
     const payload = {
       match_id: matchId,
       team_id: form.team_id,
-      dorsal: Number(form.dorsal),
+      player_id: form.player_id || null,
+      dorsal: form.dorsal === '' ? null : Number(form.dorsal),
       position_observed: form.position_observed,
-      performance_rating: Number(form.performance_rating),
-      potential: Number(form.potential),
-      projected_level: form.projected_level,
+      performance_rating: form.performance_rating === '' ? null : Number(form.performance_rating),
+      potential: form.potential === '' ? null : Number(form.potential),
+      projected_level: form.projected_level || null,
       projected_position: form.projected_position.length ? form.projected_position : null,
       note: form.note.trim() || null,
     }
@@ -120,14 +217,25 @@ function PendingMatchObservations() {
       : await supabase.from('observations').insert([payload])
 
     if (response.error) {
-      setError(response.error.message.includes('finalized')
-        ? 'El partido ya está cerrado y sus observaciones no se pueden modificar.'
-        : response.error.message)
+      const message = response.error.message || ''
+      if (response.error.code === '23505' || message.includes('observations_uniq')) {
+        setError('Ya existe una observación con ese jugador o ese dorsal en este partido.')
+      } else if (message.includes('finalized')) {
+        setError('El partido ya está cerrado y sus observaciones no se pueden modificar.')
+      } else {
+        setError(message)
+      }
     } else {
       setNotice(editingId ? 'Observación actualizada.' : 'Observación registrada.')
       setForm(EMPTY_FORM)
       setEditingId(null)
       setProjectedPositionOpen(false)
+      setPerformanceOpen(false)
+      setPotentialOpen(false)
+      setLinkedPlayer(null)
+      setNewPlayerOpen(false)
+      setNewPlayerName('')
+      setSimilar([])
       await loadData()
     }
     setSaving(false)
@@ -137,15 +245,21 @@ function PendingMatchObservations() {
     setEditingId(observation.observation_id)
     setForm({
       team_id: observation.team_id,
-      dorsal: observation.dorsal,
+      player_id: observation.player_id || '',
+      dorsal: observation.dorsal ?? '',
       position_observed: observation.position_observed || [],
-      performance_rating: observation.performance_rating ?? 5,
-      potential: observation.potential ?? 3,
-      projected_level: observation.projected_level || 'first_division',
+      performance_rating: observation.performance_rating ?? '',
+      potential: observation.potential ?? '',
+      projected_level: observation.projected_level || '',
       projected_position: observation.projected_position || [],
       note: observation.note || '',
     })
     setProjectedPositionOpen(Boolean(observation.projected_position?.length))
+    setPerformanceOpen(observation.performance_rating != null)
+    setPotentialOpen(observation.potential != null)
+    setLinkedPlayer(observation.player_id ? { player_id: observation.player_id, canonical_name: observation.player_canonical_name || 'Jugador vinculado' } : null)
+    setNewPlayerOpen(false)
+    setNewPlayerName('')
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
@@ -190,20 +304,46 @@ function PendingMatchObservations() {
           <div className="panel-heading"><div><p className="eyebrow">REGISTRO</p><h2>Nueva observación</h2></div><span>{observations.length} registradas</span></div>
           <form onSubmit={saveObservation}>
             <div className="form-grid">
-              <label>Equipo<select value={form.team_id} onChange={(event) => updateForm('team_id', event.target.value)}><option value="">Seleccionar equipo</option>{teamOptions.map(([id, name]) => <option key={id} value={id}>{name}</option>)}</select></label>
-              <label>Dorsal<input type="number" min="1" max="99" step="1" value={form.dorsal} onChange={(event) => updateForm('dorsal', event.target.value)} /></label>
-              <label>Rendimiento: {form.performance_rating}/10<input type="range" min="1" max="10" step="1" value={form.performance_rating} onChange={(event) => updateForm('performance_rating', event.target.value)} /></label>
-              <label>Potencial: {form.potential}/5 ⭐<input type="range" min="1" max="5" step="1" value={form.potential} onChange={(event) => updateForm('potential', event.target.value)} /></label>
-              <label>Proyección<select value={form.projected_level} onChange={(event) => updateForm('projected_level', event.target.value)}>{PROJECTED_LEVELS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+              <label>Equipo<select value={form.team_id} onChange={(event) => { setLinkedPlayer(null); setForm((current) => ({ ...current, team_id: event.target.value, player_id: '' })); setError(''); setNotice('') }}><option value="">Seleccionar equipo</option>{teamOptions.map(([id, name]) => <option key={id} value={id}>{name}</option>)}</select></label>
+              <label>Dorsal (o vincula un jugador)<input type="number" min="1" max="99" step="1" value={form.dorsal} onChange={(event) => updateForm('dorsal', event.target.value)} /></label>
+              <label>Proyección (opcional)<select value={form.projected_level} onChange={(event) => updateForm('projected_level', event.target.value)}><option value="">Sin indicar</option>{PROJECTED_LEVELS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
             </div>
+            {form.team_id && <div className="player-link">
+              {linkedPlayer ? (
+                <div className="player-linked"><span><strong>Jugador:</strong> {linkedPlayer.canonical_name}</span><button type="button" className="btn-secondary" onClick={unlinkPlayer}>Quitar vínculo</button></div>
+              ) : (
+                <>
+                  <p className="player-link-label">Sugeridos de este equipo</p>
+                  {loadingSuggested ? <p className="player-hint">Cargando sugeridos…</p>
+                    : suggested.length ? <div className="player-suggested-list">{suggested.map((player) => <button type="button" key={player.player_id} onClick={() => linkPlayer(player, { prefill: true })}><strong>{player.canonical_name}</strong><small>#{player.last_dorsal ?? '—'} · {player.positions?.join(', ') || 'sin posición'} · {player.observations_count} obs.</small></button>)}</div>
+                      : <p className="player-hint">No hay jugadores sugeridos para este equipo todavía.</p>}
+                  <button type="button" className="btn-secondary" onClick={() => { setNewPlayerOpen((open) => !open); setError('') }}>{newPlayerOpen ? 'Cancelar jugador nuevo' : '+ Jugador nuevo'}</button>
+                  {newPlayerOpen && <div className="player-new">
+                    <label>Nombre del jugador<input type="text" value={newPlayerName} onChange={(event) => setNewPlayerName(event.target.value)} placeholder="Nombre y apellidos" /></label>
+                    {loadingSimilar && <p className="player-hint">Buscando parecidos…</p>}
+                    {similar.length > 0 && <div className="player-similar"><p className="player-link-label">¿Es este?</p>{similar.map((player) => <button type="button" key={player.player_id} onClick={() => linkPlayer(player)}><strong>{player.canonical_name}</strong><small>vincular</small></button>)}</div>}
+                    <button type="button" className="btn-primary" onClick={createAndLink} disabled={creatingPlayer || newPlayerName.trim().length < 2}>{creatingPlayer ? 'Creando…' : `Crear y vincular «${newPlayerName.trim() || '…'}»`}</button>
+                  </div>}
+                  <p className="player-hint">O déjalo sin vincular e identifícalo solo con el dorsal.</p>
+                </>
+              )}
+            </div>}
             <PositionPicker label="Posición observada" field="position_observed" values={form.position_observed} onToggle={togglePosition} />
+            <button className="btn-secondary" type="button" onClick={togglePerformance}>
+              {performanceOpen ? 'Quitar rendimiento' : '+ Añadir rendimiento'}
+            </button>
+            {performanceOpen && <label className="optional-slider">Rendimiento: {form.performance_rating || 5}/10<input type="range" min="1" max="10" step="1" value={form.performance_rating || 5} onChange={(event) => updateForm('performance_rating', event.target.value)} /></label>}
+            <button className="btn-secondary" type="button" onClick={togglePotential}>
+              {potentialOpen ? 'Quitar potencial' : '+ Añadir potencial'}
+            </button>
+            {potentialOpen && <label className="optional-slider">Potencial: {form.potential || 3}/5 ⭐<input type="range" min="1" max="5" step="1" value={form.potential || 3} onChange={(event) => updateForm('potential', event.target.value)} /></label>}
             <button className="btn-secondary" type="button" onClick={() => setProjectedPositionOpen((current) => !current)}>
               {projectedPositionOpen ? 'Ocultar posición proyectada' : '+ Añadir posición proyectada'}
             </button>
             {projectedPositionOpen && <PositionPicker label="Posición proyectada" field="projected_position" values={form.projected_position} onToggle={togglePosition} />}
             <label>Nota libre<textarea rows="3" value={form.note} onChange={(event) => updateForm('note', event.target.value)} /></label>
             <button className="btn-primary" type="submit" disabled={saving}>{saving ? 'Guardando...' : editingId ? 'Actualizar observación' : 'Registrar observación'}</button>
-            {editingId && <button className="btn-secondary" type="button" onClick={() => { setEditingId(null); setForm(EMPTY_FORM); setProjectedPositionOpen(false) }}>Cancelar edición</button>}
+            {editingId && <button className="btn-secondary" type="button" onClick={() => { setEditingId(null); setForm(EMPTY_FORM); setProjectedPositionOpen(false); setPerformanceOpen(false); setPotentialOpen(false); setLinkedPlayer(null); setNewPlayerOpen(false); setNewPlayerName('') }}>Cancelar edición</button>}
           </form>
       </section>
 

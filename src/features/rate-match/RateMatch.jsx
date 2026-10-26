@@ -14,6 +14,7 @@ function RateMatch() {
   const [awayPenalties, setAwayPenalties] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [confirmUnrated, setConfirmUnrated] = useState(false)
 
   useEffect(() => {
     if (match && match.status !== 'pending') {
@@ -30,20 +31,16 @@ function RateMatch() {
     setError('')
   }
 
-  async function finalizeMatch(event) {
-    event.preventDefault()
-    if (rating == null) {
-      setError('Selecciona una valoración antes de finalizar el partido.')
-      return
-    }
-
+  async function finalize(ratingValue) {
     const hasHomePenalties = homePenalties !== ''
     const hasAwayPenalties = awayPenalties !== ''
     if (penaltyTie && (!hasHomePenalties || !hasAwayPenalties)) {
+      setConfirmUnrated(false)
       setError('Indica los penaltis de ambos equipos.')
       return
     }
     if (penaltyTie && Number(homePenalties) === Number(awayPenalties)) {
+      setConfirmUnrated(false)
       setError('La tanda de penaltis debe tener un ganador.')
       return
     }
@@ -53,7 +50,7 @@ function RateMatch() {
 
     const update = {
       status: 'finalized',
-      overall_rating: Number(rating),
+      overall_rating: ratingValue == null ? null : Number(ratingValue),
       overall_note: note.trim() || null,
     }
     if (match.phase === 'knockout' && penaltyTie) {
@@ -74,6 +71,20 @@ function RateMatch() {
     }
 
     navigate('/')
+  }
+
+  function submitRated(event) {
+    event.preventDefault()
+    if (rating == null) {
+      setError('Selecciona una valoración o usa «Subir sin valorar».')
+      return
+    }
+    finalize(rating)
+  }
+
+  function confirmUnratedSubmit() {
+    setConfirmUnrated(false)
+    finalize(null)
   }
 
   if (loading) {
@@ -99,9 +110,9 @@ function RateMatch() {
 
       <section className="pending-panel closing-panel">
           <div className="panel-heading"><div><p className="eyebrow">PASO FINAL</p><h2>Confirmar cierre</h2></div></div>
-          <form onSubmit={finalizeMatch}>
+          <form onSubmit={submitRated}>
             <fieldset className="rating-stepper">
-              <legend>Valoración general <span>(obligatoria)</span></legend>
+              <legend>Valoración general <span>(opcional)</span></legend>
               <div>
                 <button type="button" aria-label="Bajar valoración" onClick={() => changeRating(-1)} disabled={rating == null}>−</button>
                 <strong>{rating ?? '—'}<small>/10</small></strong>
@@ -122,9 +133,14 @@ function RateMatch() {
               </div>}
             </fieldset>}
             <label>Nota libre (opcional)<textarea rows="4" value={note} onChange={(event) => { setNote(event.target.value); setError('') }} /></label>
-            <button type="submit" disabled={saving || rating == null}>{saving ? 'Finalizando…' : 'Finalizar partido'}</button>
+            <div className="closing-actions">
+              <button type="submit" disabled={saving || rating == null}>{saving ? 'Finalizando…' : 'Finalizar partido'}</button>
+              <button type="button" className="btn-secondary" disabled={saving} onClick={() => { setError(''); setConfirmUnrated(true) }}>Subir sin valorar</button>
+            </div>
           </form>
       </section>
+
+      {confirmUnrated && <div className="dialog-backdrop" role="presentation"><div className="dialog" role="dialog" aria-modal="true"><h2>¿Subir sin valorar?</h2><p>El partido se guardará sin valoración general. Una vez subido no podrás valorarlo más adelante.</p><div><button type="button" onClick={() => setConfirmUnrated(false)}>Volver</button><button type="button" className="danger-button" onClick={confirmUnratedSubmit} disabled={saving}>Subir sin valorar</button></div></div></div>}
     </main>
   )
 }
